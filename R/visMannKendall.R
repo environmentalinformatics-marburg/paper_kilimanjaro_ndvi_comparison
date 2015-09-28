@@ -4,6 +4,7 @@ visMannKendall <- function(rst,
                            at = seq(-1, 1, .2),
                            col.regions = NULL,
                            alpha.regions = 1,
+                           keycex = .8,
                            crs = NULL, 
                            xlab = "x", ylab = "y", scales = list(draw = TRUE),
                            xlim = bbox(rst)[1, ], ylim = bbox(rst)[2, ],
@@ -46,7 +47,8 @@ visMannKendall <- function(rst,
          col.regions = col.regions, 
          sp.layout = sp.layout, xlim = xlim, ylim = ylim,
          par.settings = list(fontsize = list(text = 15)), 
-         at = at, alpha.regions = alpha.regions)
+         at = at, alpha.regions = alpha.regions, 
+         colorkey = list(labels = list(cex = keycex)))
   
   #   levelplot(ndvi.mk, scales = list(draw = TRUE), xlab = "x", ylab = "y", 
   #             col.regions = colorRampPalette(brewer.pal(11, "BrBG")), 

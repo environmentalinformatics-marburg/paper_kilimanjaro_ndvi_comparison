@@ -21,8 +21,8 @@ ch_dir_outdata <- "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/out/"
 ## digital elevation model (dem)
 ch_fls_dem <- paste0(ch_dir_extdata, "dem/DEM_ARC1960_30m_Hemp.tif")
 rst_dem <- raster(ch_fls_dem)
-rst_dem <- projectRaster(rst_dem, crs = "+init=epsg:4326")
 rst_dem <- aggregate(rst_dem, fact = 10)
+rst_dem <- projectRaster(rst_dem, crs = "+init=epsg:4326")
 p_dem <- visDEM(rst_dem, labcex = .8, cex = 1.6)
 
 ## reference extent
@@ -68,10 +68,11 @@ p_mk <- foreach(i = c("mod13q1", "myd13q1", "gimms"),
                       xlim = c(num_xmin, num_xmax), 
                       ylim = c(num_ymin, num_ymax), 
                       scales = list(draw = TRUE, cex = .6, 
-                                    y = list(at = seq(-2.9, -3.3, -.2))))
+                                    y = list(at = seq(-2.9, -3.3, -.2))), 
+                      keycex = .4)
   
   p <- p + as.layer(p_dem)
-  p <- envinmrRasterPlot(p, rot = 90, height = .5, width = .4)
+  p <- envinmrRasterPlot(p, rot = 90, height = .5, width = .4, key.cex = .7)
   
   return(p)
 }
@@ -161,28 +162,28 @@ p_mk_comb <- latticeCombineGrid(p_mk, layout = c(2, 2))
 
 ## visualization
 
-# # png version (deprecated)
-# ch_fls_fig <- paste0(ch_dir_outdata, "fig01__mannkendall05.png")
-# png(ch_fls_fig, width = 15, height = 15, units = "cm", res = 500)
-# plot.new()
-# 
-# print(p_mk_comb, newpage = FALSE)
-# 
-# vp_rect <- viewport(x = .4975, y = .1, height = .36, width = .1, 
-#                     just = c("left", "bottom"))
-# pushViewport(vp_rect)
-# grid.rect(gp = gpar(col = "white"))
-# 
-# upViewport()
-# vp_dens <- viewport(x = .52, y = 0.1, width = .42, height = .325, 
-#                     just = c("left", "bottom"))
-# pushViewport(vp_dens)
-# print(p_dens, newpage = FALSE)
-# dev.off()
+# in-text png version
+ch_fls_png <- paste0(ch_dir_outdata, "figure01.png")
+png(ch_fls_png, width = 15.5, height = 15, units = "cm", res = 500)
+plot.new()
+
+print(p_mk_comb, newpage = FALSE)
+
+vp_rect <- viewport(x = .4975, y = .1, height = .36, width = .1, 
+                    just = c("left", "bottom"))
+pushViewport(vp_rect)
+grid.rect(gp = gpar(col = "white"))
+
+upViewport()
+vp_dens <- viewport(x = .52, y = 0.1, width = .43, height = .325, 
+                    just = c("left", "bottom"))
+pushViewport(vp_dens)
+print(p_dens, newpage = FALSE)
+dev.off()
 
 # standalone tiff version
-ch_fls_fig <- paste0(ch_dir_outdata, "fig01__mannkendall05.tiff")
-tiff(ch_fls_fig, width = 15.5, height = 15, units = "cm", res = 500, 
+ch_fls_tif <- paste0(ch_dir_outdata, "figure01.tiff")
+tiff(ch_fls_tif, width = 15.5, height = 15, units = "cm", res = 500, 
      compression = "lzw")
 plot.new()
 

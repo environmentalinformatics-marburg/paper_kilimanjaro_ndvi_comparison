@@ -17,8 +17,9 @@ ch_dir_outdata <- "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/out/"
 ## digital elevation model (dem)
 ch_fls_dem <- paste0(ch_dir_extdata, "dem/DEM_ARC1960_30m_Hemp.tif")
 rst_dem <- raster(ch_fls_dem)
+rst_dem <- aggregate(rst_dem, fact = 10)
 rst_dem <- projectRaster(rst_dem, crs = "+init=epsg:4326")
-p_dem <- visDEM(rst_dem)
+p_dem <- visDEM(rst_dem, labcex = .8, cex = 1.6)
 
 ## reference extent
 fls_ndvi <- list.files(paste0(ch_dir_extdata, "mod13q1"), 
@@ -71,8 +72,8 @@ p_ioa <- foreach(i = list(ls_ndvi[[1]], ls_ndvi[[1]], ls_ndvi[[2]]),
               scales = list(draw = TRUE, cex = .6, 
                             y = list(at = seq(-2.9, -3.3, -.2))))
 
-  # p <- p + as.layer(p_dem)
-  p <- envinmrRasterPlot(p, rot = 90, height = .5, width = .4)
+  p <- p + as.layer(p_dem)
+  p <- envinmrRasterPlot(p, rot = 90, height = .5, width = .4, key.cex = .7)
   
   return(p)
 }
@@ -145,23 +146,28 @@ p_dens <- ggplot() +
 ## combination final figure
 p_ioa_comb <- latticeCombineGrid(p_ioa, layout = c(2, 2))
 
-# # png version (deprecated)
-# ch_fls_fig <- paste0(ch_dir_outdata, "fig02__ioa.png")
-# png(ch_fls_fig, width = 24, height = 26, units = "cm", 
-#     res = 300, pointsize = 15)
-# plot.new()
-# 
-# print(p_ioa_comb, newpage = FALSE)
-# 
-# vp_dens <- viewport(x = .52, y = 0.15, width = .4575, height = .3, 
-#                     just = c("left", "bottom"))
-# pushViewport(vp_dens)
-# print(p_dens, newpage = FALSE)
-# dev.off()
+# png version (deprecated)
+ch_fls_png <- paste0(ch_dir_outdata, "figure02.png")
+png(ch_fls_png, width = 15.5, height = 15, units = "cm", res = 300)
+plot.new()
+
+print(p_ioa_comb, newpage = FALSE)
+
+vp_rect <- viewport(x = .4975, y = .1, height = .36, width = .1, 
+                    just = c("left", "bottom"))
+pushViewport(vp_rect)
+grid.rect(gp = gpar(col = "white"))
+
+upViewport()
+vp_dens <- viewport(x = .52, y = 0.1, width = .43, height = .325, 
+                    just = c("left", "bottom"))
+pushViewport(vp_dens)
+print(p_dens, newpage = FALSE)
+dev.off()
 
 # standalone tiff version
-ch_fls_fig <- paste0(ch_dir_outdata, "fig02__ioa.tiff")
-tiff(ch_fls_fig, width = 15, height = 15, units = "cm", res = 500, 
+ch_fls_tif <- paste0(ch_dir_outdata, "figure02.tiff")
+tiff(ch_fls_tif, width = 15.5, height = 15, units = "cm", res = 500, 
      compression = "lzw")
 plot.new()
 
@@ -173,7 +179,7 @@ pushViewport(vp_rect)
 grid.rect(gp = gpar(col = "white"))
 
 upViewport()
-vp_dens <- viewport(x = .52, y = 0.11, width = .43, height = .325, 
+vp_dens <- viewport(x = .52, y = 0.1, width = .43, height = .325, 
                     just = c("left", "bottom"))
 pushViewport(vp_dens)
 print(p_dens, newpage = FALSE)
