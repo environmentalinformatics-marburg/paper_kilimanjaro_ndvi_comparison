@@ -5,7 +5,8 @@ visMannKendall <- function(rst,
                            col.regions = NULL,
                            alpha.regions = 1,
                            crs = NULL, 
-                           xlab = "x", ylab = "y",
+                           xlab = "x", ylab = "y", scales = list(draw = TRUE),
+                           xlim = bbox(rst)[1, ], ylim = bbox(rst)[2, ],
                            filename = "", ...) {
   
   lib <- c("raster", "Kendall", "rasterVis", "RColorBrewer")
@@ -41,9 +42,9 @@ visMannKendall <- function(rst,
   }
   
   # Plotting
-  spplot(ndvi.mk, scales = list(draw = TRUE), xlab = xlab, ylab = ylab, 
+  spplot(ndvi.mk, scales = scales, xlab = xlab, ylab = ylab, 
          col.regions = col.regions, 
-         sp.layout = sp.layout, 
+         sp.layout = sp.layout, xlim = xlim, ylim = ylim,
          par.settings = list(fontsize = list(text = 15)), 
          at = at, alpha.regions = alpha.regions)
   

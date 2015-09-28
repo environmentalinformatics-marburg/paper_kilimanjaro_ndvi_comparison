@@ -20,6 +20,19 @@ rst_dem <- raster(ch_fls_dem)
 rst_dem <- projectRaster(rst_dem, crs = "+init=epsg:4326")
 p_dem <- visDEM(rst_dem)
 
+## reference extent
+fls_ndvi <- list.files(paste0(ch_dir_extdata, "mod13q1"), 
+                       pattern = ".tif$", full.names = TRUE)
+
+rst_ndvi <- raster(fls_ndvi[1])
+rst_ndvi <- projectRaster(rst_ndvi, crs = "+init=epsg:4326")
+rst_ndvi <- trim(rst_ndvi)
+
+num_xmin <- xmin(rst_ndvi)
+num_xmax <- xmax(rst_ndvi)
+num_ymin <- ymin(rst_ndvi)
+num_ymax <- ymax(rst_ndvi)
+
 ## index of association (ioa; 2003-2013)
 st_year <- "2003"
 nd_year <- "2012"
@@ -50,12 +63,16 @@ p_ioa <- foreach(i = list(ls_ndvi[[1]], ls_ndvi[[1]], ls_ndvi[[2]]),
           
   p <- visIOA(i, j, cores = 3, crs = "+init=epsg:4326", xlab = "", ylab = "",
               sp.layout = list("sp.text", loc = c(37.04, -3.35), 
-                               txt = k, font = 2, cex = 1.1), 
+                               txt = k, font = 2, cex = .7), 
               fun = fun,
-              filename = paste0(ch_dir_outdata, l, "_ioa_", fun, "_0312.tif"))
+              xlim = c(num_xmin, num_xmax), 
+              ylim = c(num_ymin, num_ymax), 
+              filename = paste0(ch_dir_outdata, l, "_ioa_", fun, "_0312.tif"), 
+              scales = list(draw = TRUE, cex = .6, 
+                            y = list(at = seq(-2.9, -3.3, -.2))))
 
-  p <- p + as.layer(p_dem)
-  p <- envinmrRasterPlot(p)
+  # p <- p + as.layer(p_dem)
+  p <- envinmrRasterPlot(p, rot = 90, height = .5, width = .4)
   
   return(p)
 }
@@ -105,34 +122,58 @@ p_dens <- ggplot() +
   geom_line(aes(x = val_ioa[[1]], y = ..count../sum(..count..), 
                 linetype = "Aqua|GIMMS", colour = "Aqua|GIMMS"), 
             stat = "density", lwd = .8) + 
-  geom_text(aes(x = .25, y = .008), label = "d)", fontface = "bold", size = 6) + 
+  geom_text(aes(x = .275, y = .008), label = "d)", fontface = "bold", size = 4) + 
   scale_linetype_manual("", breaks = c("Terra|Aqua", "Terra|GIMMS", "Aqua|GIMMS"), values = ltys) + 
   scale_colour_manual("", breaks = c("Terra|Aqua", "Terra|GIMMS", "Aqua|GIMMS"), values = cols) +
-  labs(x = "\nIOA", y = "Density\n") + 
+  labs(x = "IOA", y = "Density") + 
   theme_bw() + 
-  theme(text = element_text(size = 13), 
+  theme(text = element_text(size = 9.6), 
         panel.grid = element_blank(),
+        legend.key.height = unit(.5, "cm"),
         legend.margin = unit(0, "mm"),
-        legend.key.size = unit(.9, "cm"), 
+        legend.key.size = unit(1, "cm"), 
         legend.key = element_rect(colour = "transparent"),
-        legend.background = element_rect(colour = "transparent"),
-        legend.text = element_text(size = 11),
-        legend.position = c(.35, .7), legend.justification = c("center", "center"), 
+        legend.background = element_rect(fill = "transparent"),
+        legend.text = element_text(size = 8),
+        legend.position = c(.435, .8), legend.justification = c("center", "center"), 
         plot.margin = unit(rep(0, 4), units = "mm"), 
-        panel.border = element_rect(colour = "black"))
+        panel.border = element_rect(colour = "black"), 
+        axis.title.y = element_text(vjust = 1), 
+        axis.title.x = element_text(vjust = -.2))
 
 
 ## combination final figure
 p_ioa_comb <- latticeCombineGrid(p_ioa, layout = c(2, 2))
 
-ch_fls_fig <- paste0(ch_dir_outdata, "fig02__ioa.png")
-png(ch_fls_fig, width = 24, height = 26, units = "cm", 
-    res = 300, pointsize = 15)
+# # png version (deprecated)
+# ch_fls_fig <- paste0(ch_dir_outdata, "fig02__ioa.png")
+# png(ch_fls_fig, width = 24, height = 26, units = "cm", 
+#     res = 300, pointsize = 15)
+# plot.new()
+# 
+# print(p_ioa_comb, newpage = FALSE)
+# 
+# vp_dens <- viewport(x = .52, y = 0.15, width = .4575, height = .3, 
+#                     just = c("left", "bottom"))
+# pushViewport(vp_dens)
+# print(p_dens, newpage = FALSE)
+# dev.off()
+
+# standalone tiff version
+ch_fls_fig <- paste0(ch_dir_outdata, "fig02__ioa.tiff")
+tiff(ch_fls_fig, width = 15, height = 15, units = "cm", res = 500, 
+     compression = "lzw")
 plot.new()
 
 print(p_ioa_comb, newpage = FALSE)
 
-vp_dens <- viewport(x = .52, y = 0.15, width = .4575, height = .3, 
+vp_rect <- viewport(x = .4975, y = .1, height = .36, width = .1, 
+                    just = c("left", "bottom"))
+pushViewport(vp_rect)
+grid.rect(gp = gpar(col = "white"))
+
+upViewport()
+vp_dens <- viewport(x = .52, y = 0.11, width = .43, height = .325, 
                     just = c("left", "bottom"))
 pushViewport(vp_dens)
 print(p_dens, newpage = FALSE)

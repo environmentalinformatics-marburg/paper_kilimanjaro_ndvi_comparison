@@ -1,5 +1,6 @@
 visDEM <- function(dem, zlevs.conts = seq(1000, 5500, 500), 
-                   labels = c(1000, "", 2000, "", 3000, "", 4000, "", 5000, "")) {
+                   labels = c(1000, "", 2000, "", 3000, "", 4000, "", 5000, ""), 
+                   cex = 1.8, labcex = 1, ...) {
 
   ## packages
   stopifnot(require(raster))
@@ -25,7 +26,8 @@ visDEM <- function(dem, zlevs.conts = seq(1000, 5500, 500),
   ## create figure
   levelplot(z ~ x * y, colorkey = FALSE,  
             panel = function(...) {
-              panel.smoothconts(zlevs.conts = zlevs.conts, labels = labels, ...)
+              panel.smoothconts(zlevs.conts = zlevs.conts, labels = labels, 
+                                cex = cex, labcex = labcex, ...)
             })
   
 }

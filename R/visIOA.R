@@ -1,12 +1,13 @@
 visIOA <- function(x, y, 
                    cores = 1,
                    fun = c("mean", "median", "max"),
-                   sp.layout = NULL,
+                   sp.layout = NULL, scales = list(draw = TRUE), 
                    at = seq(.2, 1, .05),
                    col.regions = NULL,
                    alpha.regions = 1,
                    crs = NULL, 
                    xlab = "x", ylab = "y",
+                   xlim = bbox(rst)[1, ], ylim = bbox(rst)[2, ],
                    filename = "", ...) {
   
   ## packages
@@ -100,9 +101,9 @@ visIOA <- function(x, y,
     col.regions <- colorRampPalette(brewer.pal(3, "Reds"))
   
   ## visualize
-  spplot(rst_ioa, scales = list(draw = TRUE), xlab = xlab, ylab = ylab, 
+  spplot(rst_ioa, scales = scales, xlab = xlab, ylab = ylab, 
          col.regions = col.regions, 
-         sp.layout = sp.layout, 
+         sp.layout = sp.layout, xlim = xlim, ylim = ylim,
          par.settings = list(fontsize = list(text = 15)), 
          at = at, alpha.regions = alpha.regions)
   

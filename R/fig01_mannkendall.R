@@ -1,12 +1,16 @@
 ### environmental stuff
 
 ## packages
-lib <- c("grid", "Rsenal", "foreach", "latticeExtra", "ggplot2")
+lib <- c("grid", "Rsenal", "doParallel", "latticeExtra", "ggplot2")
 jnk <- sapply(lib, function(x) library(x, character.only = TRUE))
 
 ## functions
 source("R/visDEM.R")
 source("R/visMannKendall.R")
+
+## parallelization
+cl <- makeCluster(3)
+registerDoParallel(cl)
 
 ## folders
 ch_dir_extdata <- "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/data/"
@@ -18,14 +22,28 @@ ch_dir_outdata <- "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/out/"
 ch_fls_dem <- paste0(ch_dir_extdata, "dem/DEM_ARC1960_30m_Hemp.tif")
 rst_dem <- raster(ch_fls_dem)
 rst_dem <- projectRaster(rst_dem, crs = "+init=epsg:4326")
-p_dem <- visDEM(rst_dem)
+rst_dem <- aggregate(rst_dem, fact = 10)
+p_dem <- visDEM(rst_dem, labcex = .8, cex = 1.6)
 
-## mann-kendall trend tests (2003-2013; p < 0.001)
+## reference extent
+fls_ndvi <- list.files(paste0(ch_dir_extdata, "mod13q1"), 
+                       pattern = ".tif$", full.names = TRUE)
+
+rst_ndvi <- raster(fls_ndvi[1])
+rst_ndvi <- projectRaster(rst_ndvi, crs = "+init=epsg:4326")
+rst_ndvi <- trim(rst_ndvi)
+
+num_xmin <- xmin(rst_ndvi)
+num_xmax <- xmax(rst_ndvi)
+num_ymin <- ymin(rst_ndvi)
+num_ymax <- ymax(rst_ndvi)
+
+## mann-kendall trend tests (2003-2012; p < 0.05)
 st_year <- "2003"
 nd_year <- "2012"
 
 p_mk <- foreach(i = c("mod13q1", "myd13q1", "gimms"), 
-                txt = c("a)", "b)", "c)")) %do% {
+                txt = c("a)", "b)", "c)"), .packages = lib) %dopar% {
                   
   fls_ndvi <- list.files(paste0(ch_dir_extdata, i), 
                          pattern = ".tif$", full.names = TRUE)
@@ -37,8 +55,8 @@ p_mk <- foreach(i = c("mod13q1", "myd13q1", "gimms"),
   rst_ndvi <- stack(fls_ndvi)
   
   if (i == "gimms") {
-    spy <- rasterToPolygons(rst_ndvi[[1]])
-    rst_ndvi <- crop(rst_ndvi, spy)
+    spy_ndvi <- rasterToPolygons(rst_ndvi[[1]])
+    rst_ndvi <- crop(rst_ndvi, spy_ndvi)
   }
 
   p <- visMannKendall(rst = rst_ndvi, xlab = "", ylab = "",
@@ -46,10 +64,14 @@ p_mk <- foreach(i = c("mod13q1", "myd13q1", "gimms"),
                       filename = paste0(ch_dir_outdata, i, "_mk05_0312.tif"), 
                       format = "GTiff", overwrite = TRUE, 
                       sp.layout = list("sp.text", loc = c(37.04, -3.35), 
-                                       txt = txt, font = 2, cex = 1.1))
+                                       txt = txt, font = 2, cex = .7), 
+                      xlim = c(num_xmin, num_xmax), 
+                      ylim = c(num_ymin, num_ymax), 
+                      scales = list(draw = TRUE, cex = .6, 
+                                    y = list(at = seq(-2.9, -3.3, -.2))))
   
   p <- p + as.layer(p_dem)
-  p <- envinmrRasterPlot(p)
+  p <- envinmrRasterPlot(p, rot = 90, height = .5, width = .4)
   
   return(p)
 }
@@ -115,34 +137,68 @@ p_dens <- ggplot() +
   geom_line(aes(x = val_mk[[1]], y = ..count../sum(..count..), 
                 linetype = "GIMMS", colour = "GIMMS"), 
             stat = "density", lwd = .8) + 
-  geom_text(aes(x = -.675, y = .016), label = "d)", fontface = "bold", size = 6) + 
+  geom_text(aes(x = -.675, y = .016), label = "d)", fontface = "bold", size = 4) + 
   scale_linetype_manual("", breaks = c("Terra", "Aqua", "GIMMS"), values = ltys) + 
   scale_colour_manual("", breaks = c("Terra", "Aqua", "GIMMS"), values = cols) +
-  labs(x = expression(atop("", "Kendall's " * tau)), y = "Density\n") + 
+  labs(x = expression("Kendall's " * tau), y = "Density") + 
   theme_bw() + 
-  theme(text = element_text(size = 13), 
+  theme(text = element_text(size = 9.6), 
         panel.grid = element_blank(),
+        legend.key.height = unit(.5, "cm"),
         legend.key.size = unit(1, "cm"), 
         legend.key = element_rect(colour = "transparent"),
-        legend.text = element_text(size = 11),
-        legend.position = c(.8, .65), legend.justification = c("center", "center"), 
+        legend.text = element_text(size = 8),
+        legend.position = c(.75, .7), legend.justification = c("center", "center"), 
+        legend.background = element_rect(fill = "transparent"),
         plot.margin = unit(rep(0, 4), units = "mm"), 
-        panel.border = element_rect(colour = "black"))
+        panel.border = element_rect(colour = "black"), 
+        axis.title.y = element_text(vjust = 1), 
+        axis.title.x = element_text(vjust = -.2))
 
 
 ## combination final figure
 p_mk_comb <- latticeCombineGrid(p_mk, layout = c(2, 2))
 
-ch_fls_fig <- paste0(ch_dir_outdata, "fig01__mannkendall05.png")
-png(ch_fls_fig, width = 24, height = 26, units = "cm", 
-    res = 300, pointsize = 15)
+## visualization
+
+# # png version (deprecated)
+# ch_fls_fig <- paste0(ch_dir_outdata, "fig01__mannkendall05.png")
+# png(ch_fls_fig, width = 15, height = 15, units = "cm", res = 500)
+# plot.new()
+# 
+# print(p_mk_comb, newpage = FALSE)
+# 
+# vp_rect <- viewport(x = .4975, y = .1, height = .36, width = .1, 
+#                     just = c("left", "bottom"))
+# pushViewport(vp_rect)
+# grid.rect(gp = gpar(col = "white"))
+# 
+# upViewport()
+# vp_dens <- viewport(x = .52, y = 0.1, width = .42, height = .325, 
+#                     just = c("left", "bottom"))
+# pushViewport(vp_dens)
+# print(p_dens, newpage = FALSE)
+# dev.off()
+
+# standalone tiff version
+ch_fls_fig <- paste0(ch_dir_outdata, "fig01__mannkendall05.tiff")
+tiff(ch_fls_fig, width = 15.5, height = 15, units = "cm", res = 500, 
+     compression = "lzw")
 plot.new()
 
 print(p_mk_comb, newpage = FALSE)
 
-vp_dens <- viewport(x = .52, y = 0.15, width = .4575, height = .3, 
+vp_rect <- viewport(x = .4975, y = .1, height = .36, width = .1, 
+                    just = c("left", "bottom"))
+pushViewport(vp_rect)
+grid.rect(gp = gpar(col = "white"))
+
+upViewport()
+vp_dens <- viewport(x = .52, y = 0.1, width = .43, height = .325, 
                     just = c("left", "bottom"))
 pushViewport(vp_dens)
 print(p_dens, newpage = FALSE)
 dev.off()
 
+## deregister parallel backend
+stopCluster(cl)
