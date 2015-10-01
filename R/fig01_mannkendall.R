@@ -13,7 +13,7 @@ cl <- makeCluster(3)
 registerDoParallel(cl)
 
 ## folders
-ch_dir_extdata <- "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/data/"
+ch_dir_extdata <- "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/data/rst/"
 ch_dir_outdata <- "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/out/"
 
 ### data processing
@@ -26,8 +26,7 @@ rst_dem <- projectRaster(rst_dem, crs = "+init=epsg:4326")
 p_dem <- visDEM(rst_dem, labcex = .8, cex = 1.6)
 
 ## reference extent
-fls_ndvi <- list.files(paste0(ch_dir_extdata, "mod13q1"), 
-                       pattern = ".tif$", full.names = TRUE)
+fls_ndvi <- paste0(ch_dir_extdata, "MOD13Q1.006/whittaker_dsn/DSN_SCL_MVC_200301.tif")
 
 rst_ndvi <- raster(fls_ndvi[1])
 rst_ndvi <- projectRaster(rst_ndvi, crs = "+init=epsg:4326")
@@ -42,11 +41,12 @@ num_ymax <- ymax(rst_ndvi)
 st_year <- "2003"
 nd_year <- "2012"
 
-p_mk <- foreach(i = c("mod13q1", "myd13q1", "gimms"), 
-                txt = c("a)", "b)", "c)"), .packages = lib) %dopar% {
+p_mk <- foreach(i = c("MOD13Q1.005", "MYD13Q1.005", 
+                      "MOD13Q1.006", "MYD13Q1.006"), 
+                txt = c("b)", "c)", "d)", "e)", "f)"), .packages = lib) %dopar% {
                   
-  fls_ndvi <- list.files(paste0(ch_dir_extdata, i), 
-                         pattern = ".tif$", full.names = TRUE)
+  fls_ndvi <- list.files(paste0(ch_dir_extdata, i), recursive = TRUE,
+                         pattern = "^DSN_SCL.*.tif$", full.names = TRUE)
   
   st <- grep(st_year, fls_ndvi)[1]
   nd <- grep(nd_year, fls_ndvi)[length(grep(nd_year, fls_ndvi))]
