@@ -60,54 +60,63 @@ rst_gimms <-
   }
 
 
-## Whittaker smoothing
+## remove white margins
 
-# Avl files
-fls_gimms <- list.files("data/rst/", pattern = "_crp_utm.tif$", 
+# trim
+fls_prj <- list.files("data/rst/GIMMS3g/prj", pattern = "^PRJ_.*.tif$", 
                         full.names = TRUE)
+rst_prj <- stack(fls_prj)
+
+spy_prj <- rasterToPolygons(rst_prj[[1]])
+
+fls_trm <- paste0("data/rst/GIMMS3g/trm/TRM_", basename(fls_prj))
+
+rst_trm <- foreach(i = 1:nlayers(rst_prj), .packages = c("raster", "rgdal"), 
+                   .combine = "stack") %dopar% {
+  rst <- crop(rst_prj[[i]], spy_prj)
+  rst <- writeRaster(rst, filename = fls_trm[i], format = "GTiff", 
+                     overwrite = TRUE)
+}
+
+## Whittaker smoothing
 
 # Setup `orgTime` object -> replace %Y%m with %Y%m%d (compatible to `as.Date` in
 # `orgTime`)
 org_gimms <- basename(fls_gimms)
-org_gimms <- sapply(org_gimms, function(i) {
-  gsub(substr(i, 4, 9), paste0(substr(i, 4, 9), "01"), i)
-})
+for (i in 1:length(org_gimms)) {
+  dt_yrmn <- substr(org_gimms[i], 12, 17)
+  dt_yrmndy <- paste0(dt_yrmn, ifelse(i %% 2 == 1, "01", "15"))
+  org_gimms[i] <- gsub(dt_yrmn, dt_yrmndy, org_gimms[i])
+}
+
+# org_gimms <- sapply(org_gimms[seq(1, length(org_gimms), 2)], function(i) {
+#   gsub(substr(i, 12, 17), paste0(substr(i, 12, 17), "01"), i)
+# })
+
 org_gimms <- 
-  orgTime(org_gimms, pillow = 0, pos1 = 4, pos2 = 11, format = "%Y%m%d")
+  orgTime(org_gimms, pillow = 0, pos1 = 12, pos2 = 19, format = "%Y%m%d")
 
 # Perform Whittaker smoothing
 rst_gimms_wht <- 
   whittaker.raster(fls_gimms, timeInfo = org_gimms, lambda = 6000, nIter = 3, 
                    removeOutlier = TRUE, threshold = 0.2, groupYears = FALSE,
-                   outDirPath = "data/rst/whittaker", overwrite = TRUE)
-
-# Save Whittaker files separately
-rst_gimms_wht <- 
-  foreach(i = rst_gimms_wht[[1]], j = fls_gimms, .combine = "stack") %do% {
-            outdir <- paste0(dirname(j), "/whittaker")
-            outfile <- paste0(substr(basename(j), 1, nchar(basename(j))-4), "_wht")
-            file_out <- paste(outdir, outfile, sep = "/")
-            writeRaster(i, filename = file_out, format = "GTiff", overwrite = TRUE)
-          }
-
+                   outDirPath = "data/rst/GIMMS3g/whittaker", overwrite = TRUE)
 
 ## Monthly aggregation
 
-# Avl files
-fls_gimms_wht <- list.files("data/rst/whittaker", pattern = "_crp_utm_wht.tif$", 
-                            full.names = TRUE)
+# available files
+fls_gimms_wht <- list.files("data/rst/GIMMS3g/whittaker", 
+                            pattern = "^MCD.*.tif$", full.names = TRUE)
 
-# Outnames
-fls_out <- paste0(substr(basename(fls_gimms_wht), 1, 9),
-                  substr(basename(fls_gimms_wht), 17, (nchar(basename(fls_gimms_wht))-4)), 
-                  "_aggmax")
-fls_out <- paste(unique(dirname(fls_gimms_wht)), unique(fls_out), sep = "/")
-
-# Aggregation, `fun = max`
+# aggregate
 rst_gimms_agg <- aggregateGimms(files = fls_gimms_wht, 
-                                start = 4, stop = 9)
+                                start = 5, stop = 11)
 
 # Output storage
+fls_ext <- strftime(as.Date(substr(basename(fls_gimms_wht), 5, 11), format = "%Y%j"), 
+                    format = "%Y%m")
+fls_out <- paste0("data/rst/GIMMS3g/whittaker_mvc/MVC_MCD.", fls_ext, ".yL6000.ndvi")
+
 ls_gimms_agg <- lapply(seq(nlayers(rst_gimms_agg)), function(i) {
   writeRaster(rst_gimms_agg[[i]], filename = fls_out[i], 
               format = "GTiff", overwrite = TRUE)
