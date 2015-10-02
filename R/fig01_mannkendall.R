@@ -19,7 +19,7 @@ ch_dir_outdata <- "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/out/"
 ### data processing
 
 ## digital elevation model (dem)
-ch_fls_dem <- paste0(ch_dir_extdata, "dem/DEM_ARC1960_30m_Hemp.tif")
+ch_fls_dem <- paste0(ch_dir_extdata, "../dem/DEM_ARC1960_30m_Hemp.tif")
 rst_dem <- raster(ch_fls_dem)
 rst_dem <- aggregate(rst_dem, fact = 10)
 rst_dem <- projectRaster(rst_dem, crs = "+init=epsg:4326")
@@ -37,16 +37,20 @@ num_xmax <- xmax(rst_ndvi)
 num_ymin <- ymin(rst_ndvi)
 num_ymax <- ymax(rst_ndvi)
 
+## study area
+
+
 ## mann-kendall trend tests (2003-2012; p < 0.05)
 st_year <- "2003"
 nd_year <- "2012"
 
-p_mk <- foreach(i = c("MOD13Q1.005", "MYD13Q1.005", 
+p_mk <- foreach(i = c("GIMMS3g", 
+                      "MOD13Q1.005", "MYD13Q1.005", 
                       "MOD13Q1.006", "MYD13Q1.006"), 
                 txt = c("b)", "c)", "d)", "e)", "f)"), .packages = lib) %dopar% {
                   
   fls_ndvi <- list.files(paste0(ch_dir_extdata, i), recursive = TRUE,
-                         pattern = "^DSN_SCL.*.tif$", full.names = TRUE)
+                         pattern = "^DSN_.*.tif$", full.names = TRUE)
   
   st <- grep(st_year, fls_ndvi)[1]
   nd <- grep(nd_year, fls_ndvi)[length(grep(nd_year, fls_ndvi))]
@@ -54,11 +58,6 @@ p_mk <- foreach(i = c("MOD13Q1.005", "MYD13Q1.005",
   fls_ndvi <- fls_ndvi[st:nd]
   rst_ndvi <- stack(fls_ndvi)
   
-  if (i == "gimms") {
-    spy_ndvi <- rasterToPolygons(rst_ndvi[[1]])
-    rst_ndvi <- crop(rst_ndvi, spy_ndvi)
-  }
-
   p <- visMannKendall(rst = rst_ndvi, xlab = "", ylab = "",
                       p_value = .05, crs = "+init=epsg:4326",
                       filename = paste0(ch_dir_outdata, i, "_mk05_0312.tif"), 
@@ -71,7 +70,7 @@ p_mk <- foreach(i = c("MOD13Q1.005", "MYD13Q1.005",
                                     y = list(at = seq(-2.9, -3.3, -.2))), 
                       keycex = .4)
   
-  p <- p + as.layer(p_dem)
+  # p <- p + as.layer(p_dem)
   p <- envinmrRasterPlot(p, rot = 90, height = .5, width = .4, key.cex = .7)
   
   return(p)
