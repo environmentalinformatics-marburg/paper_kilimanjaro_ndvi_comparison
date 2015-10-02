@@ -1,8 +1,11 @@
 ### environmental stuff
 
-# working directory
+## functions (located in repository, not on external hdd)
+source("R/aggregateGimms.R")
+
+## working directory
 library(Orcs)
-setwdOS(path_lin = "/media/dogbert/XChange/", path_win = "D:/", 
+setwdOS(path_lin = "/media/fdetsch/XChange/", path_win = "D:/", 
         path_ext = "kilimanjaro/ndvi_comparison")
 
 ## install old 'MODIS' version (bug in MODIS_0.10-33::whittaker.raster has not 
@@ -19,11 +22,8 @@ MODISoptions(localArcPath = paste0(getwd(), "/data/MODIS_ARC/"),
              outDirPath = paste0(getwd(), "/data/MODIS_ARC/PROCESSED/"), 
              MODISserverOrder = c("LAADS","LPDAAC"), quiet = TRUE)
 
-## functions
-source("src/aggregateGimms.R")
-
 ## parallelization
-cl <- makeCluster(3)
+cl <- makeCluster(4)
 registerDoParallel(cl)
 
 ## geographic extent
@@ -43,7 +43,6 @@ fls_hdr <- createHdr(file = "data/gimms3g.hdr")
 
 
 ## Data processing
-
 rst_gimms <- 
   foreach(i = fls_gimms, .packages = c("Rsenal", "zoo"), .combine = "stack", 
           .export = ls(envir = globalenv())) %dopar% {
@@ -82,7 +81,7 @@ spy_prj <- rasterToPolygons(rst_prj[[1]])
 dir_trm <- "data/rst/GIMMS3g/trm/"
 fls_trm <- paste0(dir_trm, "TRM_", basename(fls_prj))
 
-rst_trm <- foreach(i = 1:nlayers(rst_prj), .packages = c("raster", "rgdal"), 
+rst_trm <- foreach(i = (1:nlayers(rst_prj))[c(283, 284, 291)], .packages = c("raster", "rgdal"), 
                    .combine = "stack") %dopar% {
                      rst <- crop(rst_prj[[i]], spy_prj)
                      rst <- writeRaster(rst, filename = fls_trm[i], format = "GTiff", 
@@ -120,12 +119,15 @@ rst_wht <-
                    outDirPath = "data/rst/GIMMS3g/whittaker", overwrite = TRUE)
 
 # store
+rst_wht <- stack("data/rst/GIMMS3g/whittaker/NDVI_YearlyLambda6000_fullPeriod.tif")
+
 dir_wht <- "data/rst/GIMMS3g/whittaker/"
 fls_wht <- paste0(dir_wht, "WHT_", basename(fls_trm))
-rst_wht <- foreach(i = 1:nlayers(rst_wht[[1]]), j = fls_wht, 
-                   .combine = "stack", .packages = c("raster", "rgdal")) %dopar% {
-  writeRaster(rst_wht[[1]], filename = j, format = "GTiff", overwrite = TRUE)
+ls_rst_wht <- foreach(i = 1:nlayers(rst_wht), j = fls_wht, 
+                      .packages = c("raster", "rgdal")) %dopar% {
+  writeRaster(rst_wht[[i]], filename = j, format = "GTiff", overwrite = TRUE)
 }
+rst_wht <- stack(ls_rst_wht)
 
 ## Monthly aggregation
 
@@ -134,50 +136,37 @@ fls_wht <- list.files("data/rst/GIMMS3g/whittaker",
                       pattern = "^WHT_TRM.*.tif$", full.names = TRUE)
 
 # aggregate
-rst_agg <- aggregateGimms(files = fls_wht, start = 20, stop = 25)
+dir_mvc <- "data/rst/GIMMS3g/whittaker_mvc/"
+fls_mvc <- paste0(dir_mvc, "MVC_", unique(substr(basename(fls_wht), 1, 25)))
+rst_agg <- aggregateGimms(files = fls_wht, files_out = fls_mvc, 
+                          start = 20, stop = 25, nodes = 3L, 
+                          format = "GTiff", overwrite = TRUE)
+
+## deseason
+
+# import data
+fls_agg <- list.files("data/rst/GIMMS3g/whittaker_mvc/", 
+                      pattern = "^MVC_.*.tif$", full.names = TRUE)
+fls_agg <- fls_agg[7:length(fls_agg)] # remove jul-dec 1981
+rst_agg <- stack(fls_agg)
+
+# deseason
+rst_dsn <- deseason(rst_agg, use.cpp = TRUE)
 
 # store
-dir_mvc <- "data/rst/GIMMS3g/whittaker_mvc/"
-fls_mvc <- paste0(dir_mvc, "MVC_", basename(fls_wht))
+dir_dsn <- "data/rst/GIMMS3g/whittaker_dsn/"
+fls_dsn <- paste0(dir_dsn, "DSN_", basename(fls_agg))
 
-ls_mvc <- foreach(i = seq(nlayers(rst_gimms_agg)), 
-                  .packages = c("raster", "rgdal")) %dopar% {
-  writeRaster(rst_agg[[i]], filename = fls_mvc[i], 
-              format = "GTiff", overwrite = TRUE)
+ls_rst_dsn <- foreach(i = 1:nlayers(rst_dsn), j = fls_dsn, 
+                   .packages = c("raster", "rgdal")) %dopar% {
+  writeRaster(rst_dsn[[i]], filename = j, format = "GTiff", overwrite = TRUE)
 }
-rst_mvc <- stack(ls_mvc)
+rst_dsn <- stack(ls_rst_dsn)
 
-# fls_gimms_agg <- list.files("data/rst/", pattern = "aggmax.tif$", 
-#                             full.names = TRUE)
-# ls_gimms_agg <- lapply(fls_gimms_agg, raster)
-rst_gimms_agg <- stack(ls_gimms_agg)
+## deregister parallel backend
+stopImplicitCluster()
 
-
-## Deseasoning
-
-fls_gimms_aggmax <- list.files("data/rst/whittaker", pattern = "_aggmax.tif$", 
-                               full.names = TRUE)
-fls_gimms_aggmax <- 
-  fls_gimms_aggmax[grep("1982", fls_gimms_aggmax)[1]:length(fls_gimms_aggmax)]
-rst_gimms_aggmax <- stack(fls_gimms_aggmax)
-
-rst_gimms_aggmax_dsn <- deseason(rst_gimms_aggmax)
-
-# Outnames
-dir_out <- unique(dirname(fls_gimms_aggmax))
-fls_out <- paste0(dir_out, "/", names(rst_gimms_aggmax), "_dsn")
-
-ls_gimms_aggmax_dsn <- lapply(1:nlayers(rst_gimms_aggmax_dsn), function(i) {
-  writeRaster(rst_gimms_aggmax_dsn[[i]], filename = fls_out[i], 
-              format = "GTiff", overwrite = TRUE) 
-})
-
-rst_gimms_aggmax_dsn <- stack(ls_gimms_aggmax_dsn)
-
-# Deregister parallel backend
-stopCluster(cl)
-
-## re-install recent 'MODIS' version
+## re-install most recent 'MODIS' version
 detach("package:MODIS")
 install.packages("http://download.r-forge.r-project.org/src/contrib/MODIS_0.10-33.tar.gz", 
                  repos = NULL)
