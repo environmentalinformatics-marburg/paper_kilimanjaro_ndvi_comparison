@@ -21,8 +21,13 @@ visKili <- function(lwd = 2, col = "black", fill = "white", cex = 2) {
   ## visualization
   ylim <- c(ymin(spy_africa) - 2, ymax(spy_africa) + 2)
   
-  spplot(spy_africa, col = "transparent", "ADMIN", colorkey = FALSE, col.regions = "grey85", ylim = ylim,
-         par.settings = list(panel.background = list(col = "white"))) + 
-    latticeExtra::layer(sp.polygons(spy_tanzania, fill = "grey50", col = "transparent")) + 
-    latticeExtra::layer(sp.points(spt_kili, col = "black", pch = 24, cex = .5, fill = "white"))
+  p <- spplot(spy_africa, col = "transparent", "ADMIN", colorkey = FALSE, col.regions = "grey85", ylim = ylim,
+              par.settings = list(panel.background = list(col = "white"))) 
+  
+  p +
+    latticeExtra::layer(panel.refline(h = 0, col = "grey60", lty = 2, lwd = .5)) + 
+    latticeExtra::layer(sp.polygons(spy_tanzania, fill = "grey50", col = "transparent"), 
+                        data = list(spy_tanzania = spy_tanzania)) + 
+    latticeExtra::layer(sp.points(spt_kili, col = "black", pch = 24, cex = .5, fill = "white"), 
+                        data = list(spt_kili = spt_kili))
 }

@@ -6,6 +6,7 @@ lib <- c("grid", "Rsenal", "doParallel", "latticeExtra", "ggplot2",
 jnk <- sapply(lib, function(x) library(x, character.only = TRUE))
 
 ## functions
+source("R/mkStats.R")
 source("R/visKili.R")
 source("R/visDEM.R")
 source("R/visMannKendall.R")
@@ -49,9 +50,10 @@ products <- c("GIMMS3g",
 
 label <- c("b)", "c)", "d)", "e)", "f)")
 label <- sapply(1:length(label), function(i) paste(label[i], products[i]))
+label[1] <- "b) GIMMS NDVI3g"
 
 p_mk <- foreach(i = products, txt = label, .packages = lib) %dopar% {
-                  
+  
   fls_ndvi <- list.files(paste0(ch_dir_extdata, i), recursive = TRUE,
                          pattern = "^DSN_.*.tif$", full.names = TRUE)
   
@@ -80,7 +82,7 @@ p_mk <- foreach(i = products, txt = label, .packages = lib) %dopar% {
 
 ## statistics
 fls_mk05 <- list.files(ch_dir_outdata, pattern = "mk05_0312.tif$", 
-                        full.names = TRUE)
+                       full.names = TRUE)
 rst_mk05 <- lapply(fls_mk05, raster)
 
 df_mk_stats <- foreach(i = rst_mk05, .combine = "rbind") %do% mkStats(i)
@@ -129,9 +131,9 @@ print(p_mk_comb, newpage = FALSE)
 
 # add key
 vp_key <- viewport(x = .5, y = .885,
-                height = 0.1, width = .8,
-                just = c("center", "bottom"),
-                name = "key.vp")
+                   height = 0.1, width = .8,
+                   just = c("center", "bottom"),
+                   name = "key.vp")
 pushViewport(vp_key)
 draw.colorkey(key = list(col = colorRampPalette(brewer.pal(11, "BrBG")), 
                          width = .6, height = .5,
@@ -146,6 +148,11 @@ vp_rect <- viewport(x = .365, y = .6635, height = .315, width = .15,
                     just = c("left", "bottom"))
 pushViewport(vp_rect)
 print(p_topo, newpage = FALSE)
+
+# add equator label
+downViewport(trellis.vpname("figure"))
+grid.text(x = .05, y = .38, just = c("left", "bottom"), label = "Eq.", 
+          gp = gpar(cex = .3))
 
 dev.off()
 
