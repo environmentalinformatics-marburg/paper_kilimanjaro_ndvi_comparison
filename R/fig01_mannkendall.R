@@ -110,7 +110,7 @@ p_bing <- spplot(rst_kili[[1]], col.regions = NA, colorkey = FALSE,
                                y = list(at = seq(-2.9, -3.3, -.2))))
 
 # visualize topographic map
-p_topo <- visKili(cex = 1, lwd = 1)
+p_topo <- visKili(cex = .5, lwd = .05)
 
 
 ################################################################################
