@@ -51,11 +51,12 @@ for (i in c("MOD13Q1", "MYD13Q1")) {
 # 2012-04-12
 
 ## geographic extent
-rst_kili <- kiliAerial(rasterize = TRUE, minNumTiles = 20)
-# fls_gimms <- list.files("../gimms3g/gimms3g/data/rst/", pattern = "_crp_utm.tif$", 
-#                         full.names = TRUE)
-# rst_gimms <- raster(fls_gimms[[1]])
-# kili <- rasterToPolygons(rst_gimms)
+# rst_kili <- kiliAerial(rasterize = TRUE, minNumTiles = 20)
+fls_gimms <- list.files("../gimms3g/gimms3g/data/rst/", pattern = "_crp_utm.tif$", 
+                        full.names = TRUE)
+rst_gimms <- raster(fls_gimms[[1]])
+rst_kili <- rasterToPolygons(rst_gimms)
+ext <- extent(rst_kili)
 
 ## plots
 shp_plots <- suppressWarnings(
@@ -68,25 +69,33 @@ shp_plots_amp <- subset(shp_plots, PoleType == "AMP")
 rst_dem <- raster("data/dem/DEM_ARC1960_30m_Hemp.tif")
 
 ## NDVI data
-stats <- lapply(c("MOD13Q1", "MYD13Q1"), function(h) {
+for (h in c("MOD13Q1", "MYD13Q1")) {
   
   pttrn <- paste(h, c("NDVI.tif$", "pixel_reliability.tif$", 
                       "composite_day_of_the_year.tif$"), sep = ".*")
   
   ## crop
-  ndvi.rst <- foreach(i = pttrn, .packages = c("raster", "rgdal")) %dopar% {                                      
+  overwrite <- FALSE
+  ndvi.rst <- foreach(i = pttrn) %do% {                                      
     
     # available files
     fls <- list.files(paste0("data/MODIS_ARC/PROCESSED/", h, ".006"), 
                       pattern = i, full.names = TRUE)  
-    
-    # stack, crop and store
     rst <- stack(fls)
-    rst.crp <- crop(rst, extent(rst_kili))
-    rst.crp <- writeRaster(rst.crp, format = "GTiff", overwrite = TRUE,
-                           filename = paste0("data/rst/", h, "/crp/CRP"), 
-                           bylayer = TRUE, suffix = names(rst))
-    return(rst.crp)
+
+    # output filenames    
+    fls_out <- paste0("data/rst/", h, ".006/crp/CRP_", names(rst), ".tif")
+    
+    # crop and store
+    rst_out <- foreach(i = 1:nlayers(rst), j = fls_out, .packages = "raster") %dopar% {
+      if (!file.exists(j) | overwrite) {
+        crop(rst[[i]], ext, filename = j, format = "GTiff", overwrite = TRUE)
+      } else {
+        raster(j)
+      }
+    }
+    
+    stack(rst_out)
   }
   
   #   ndvi.rst <- ndvi.rst[1:2]
@@ -107,7 +116,7 @@ stats <- lapply(c("MOD13Q1", "MYD13Q1"), function(h) {
   
   # store
   ndvi.rst.qa <- writeRaster(ndvi.rst.qa, format = "GTiff", overwrite = TRUE,
-                             filename = paste0("data/rst/", h, "/qa/QA"), 
+                             filename = paste0("data/rst/", h, ".006/qa/QA"), 
                              bylayer = TRUE, suffix = names(ndvi.rst[[1]]))
   
   #     ndvi.fls.qa <- list.files("data/processed/", full.names = TRUE, 
@@ -125,7 +134,7 @@ stats <- lapply(c("MOD13Q1", "MYD13Q1"), function(h) {
   
   # store
   ndvi.rst.qa.sd <- writeRaster(ndvi.rst.qa.sd, format = "GTiff", overwrite = TRUE,
-                                filename = paste0("data/rst/", h, "/sd/SD"), 
+                                filename = paste0("data/rst/", h, ".006/sd/SD"), 
                                 bylayer = TRUE, suffix = names(ndvi.rst.qa))
   
   #   ndvi.fls.qa.sd <- list.files("data/processed/", full.names = TRUE, 
@@ -145,7 +154,7 @@ stats <- lapply(c("MOD13Q1", "MYD13Q1"), function(h) {
 
   # store
   ndvi.rst.qa.sd.fc <- writeRaster(ndvi.rst.qa.sd.fc, format = "GTiff",
-                                   filename = paste0("data/rst/", h, "/adj/ADJ"),  
+                                   filename = paste0("data/rst/", h, ".006/adj/ADJ"),  
                                    bylayer = TRUE, suffix = names(ndvi.rst.qa.sd), 
                                    overwrite = TRUE)
 
@@ -183,7 +192,7 @@ stats <- lapply(c("MOD13Q1", "MYD13Q1"), function(h) {
                               threshold = 2000,
                               timeInfo = orgTime(ndvi.fls.init, pillow = 0), 
                               lambda = 6000, nIter = 3, groupYears = FALSE, 
-                              outDirPath = paste0("data/rst/", h, "/whittaker"), 
+                              outDirPath = paste0("data/rst/", h, ".006/whittaker"), 
                               overwrite = TRUE, format = "raster")
   
   ## monthly aggregation
@@ -193,11 +202,11 @@ stats <- lapply(c("MOD13Q1", "MYD13Q1"), function(h) {
   #                         pattern = "^WHT.*.tif$", full.names = TRUE)
   #   rst.wht <- stack(fls.wht)
   
-  dates_agg <- dates + 8
-  yearmon_agg <- as.yearmon(dates_agg)
-  indices_agg <- as.numeric(as.factor(yearmon_agg))
+  # dates_agg <- dates + 8
+  # yearmon_agg <- as.yearmon(dates_agg)
+  # indices_agg <- as.numeric(as.factor(yearmon_agg))
   
-  outdir <- paste0("data/rst/", h, "/whittaker")
+  outdir <- paste0("data/rst/", h, ".006/whittaker")
   # rst_wht_aggmax <- 
   #   stackApply(rst.wht, indices = indices_agg, fun = max, bylayer = TRUE,
   #              filename = paste0(outdir, "/AGGMAX_WHT"), format = "GTiff",  
@@ -210,14 +219,14 @@ stats <- lapply(c("MOD13Q1", "MYD13Q1"), function(h) {
   #              suffix = strftime(unique(yearmon_agg), format = "%Y%m"), 
   #              overwrite = TRUE)
   
-  fls_doy <- list.files(paste0("data/rst/", h, "/crp"), full.names = TRUE,
+  fls_doy <- list.files(paste0("data/rst/", h, ".006/crp"), full.names = TRUE,
                         pattern = paste0("^CRP_", toupper(h), ".*composite"))
   rst_doy <- ndvi.rst[[3]]
   
   dates_doy <- as.numeric(substr(basename(fls_doy), 14, 20))
   months_doy <- unique(strftime(as.Date(as.character(dates_doy), format = "%Y%j"), "%Y%m"))
   
-  file_out <- paste0("data/rst/", h, "/whittaker_mvc/MVC")
+  file_out <- paste0("data/rst/", h, ".006/whittaker_mvc/MVC")
   rst_wht_mvc <- aggregateNDVICells(rst = stack(rst.wht), 
                                     rst_doy = rst_doy, 
                                     dates = dates_doy, 
@@ -230,7 +239,7 @@ stats <- lapply(c("MOD13Q1", "MYD13Q1"), function(h) {
   # Application of scale factor and removal of inconsistent values
   # fls_wht_aggmax <- list.files(outdir, pattern = "^AGGMAX_WHT", full.names = TRUE)
   # rst_wht_aggmax <- stack(fls_wht_aggmax)
-  dir_scl <- paste0("data/rst/", h, "/whittaker_scl")
+  dir_scl <- paste0("data/rst/", h, ".006/whittaker_scl")
   fls_scl <- paste0(dir_scl, "/SCL_", names(rst_wht_mvc))
   
   rst_scl <- foreach(i = unstack(rst_wht_mvc), j = as.list(fls_scl), 
@@ -262,101 +271,17 @@ stats <- lapply(c("MOD13Q1", "MYD13Q1"), function(h) {
   
   # deseason
   rst_scl <- stack(fls_scl[st:nd])
-  rst_dsn <- deseason(rst_scl)
+  rst_dsn <- deseason(rst_scl, use.cpp = TRUE)
   
   # store
-  dir_dsn <- paste0("data/rst/", h, "/whittaker_dsn")
+  dir_dsn <- paste0("data/rst/", h, ".006/whittaker_dsn")
   fls_dsn <- paste0(dir_dsn, "/DSN_", names(rst_scl))
   rst_dsn <- foreach(i = unstack(rst_dsn), j = as.list(fls_dsn), 
                      .packages = c("raster", "rgdal"), .combine = "stack") %dopar% {
     writeRaster(i, filename = j, format = "GTiff", overwrite = TRUE)
   }
   
-  # # 2011-2013
-  # fls_scl <- list.files(outdir, pattern = "^SCL", full.names = TRUE)
-  # 
-  # # st <- grep("201101", fls_scl)
-  # # nd <- grep("201312", fls_scl)
-  # # fls_scl <- fls_scl[st:nd]
-  # 
-  # rst_scl <- stack(fls_scl)
-  # 
-  # mat_plt_val <- extract(rst_scl, plt_apoles)
-  # df_plt_val <- data.frame(PlotID = plt_apoles@data[, 1], mat_plt_val)
-  # names(df_plt_val)[2:ncol(df_plt_val)] <- 
-  #   sapply(strsplit(names(df_plt_val)[2:ncol(df_plt_val)], "_"), "[[", 4)
-  # write.csv(df_plt_val, "out/csv/ndvi_aggmin_200207_201409.csv", row.names = FALSE)
-  # 
-  # months <- substr(sapply(strsplit(fls_scl, "_"), "[[", 5), 5, 6)
-  # indices <- as.numeric(as.factor(months))
-  # 
-  # rst_scl_mmonth <- stackApply(rst_scl, indices = indices, fun = mean)
-  # 
-  # plt_scl_mmonth <- data.frame(PlotId = plt_apoles$PlotID, 
-  #                              extract(rst_scl_mmonth, plt_apoles))
-  # 
-  # id <- grep("mai2", plt_scl_mmonth$PlotId)
-  # plot(unlist(plt_scl_mmonth[id, 2:ncol(plt_scl_mmonth)]), type = "l", 
-  #      xlab = "Month", ylab = "NDVI")
-  # 
-  #   st <- ifelse(h == "MOD13Q1", "2001", "2003")
-  #   st <- "2003"
-  #   nd <- "2013"
-  # 
-  #   fls.wht <- fls.wht[grep(st, fls.wht):grep(nd, fls.wht)]
-  #   rst.wht <- stack(fls.wht)
-  #   
-  #   rst.mk <- overlay(rst.wht, fun = function(x) MannKendall(as.numeric(x))$tau, 
-  #                     filename = paste("out/MK", toupper(h), unique(substr(names(rst.wht), 1, 21)), st, nd, sep = "_"), 
-  #                     format = "GTiff", overwrite = TRUE)
-  #   rst.mk.p <- overlay(rst.wht, fun = function(x) MannKendall(as.numeric(x))$sl, 
-  #                       filename = paste("out/MK_p", toupper(h), unique(substr(names(rst.wht), 1, 21)), st, nd, sep = "_"), 
-  #                       format = "GTiff", overwrite = TRUE)
-  # 
-  #   fls.mk <- list.files("out", pattern = paste0("MK_", toupper(h), ".*.tif$"), 
-  #                        full.names = TRUE)
-  #   rst.mk <- raster(fls.mk)
-  #   
-  #   png(paste0(substr(fls.mk, 1, nchar(fls.mk)-4), ".png"), units = "mm", 
-  #       width = 300, res = 300, pointsize = 20)
-  #   print(spplot(rst.mk, scales = list(draw = TRUE), xlab = "x", ylab = "y", 
-  #          col.regions = colorRampPalette(brewer.pal(11, "BrBG")), 
-  #          sp.layout = list("sp.lines", rasterToContour(dem)), 
-  #          par.settings = list(fontsize = list(text = 15)), at = seq(-.9, .9, .1)))
-  #   dev.off()
-  #   
-  #   stats <- lapply(c(.01, .001), function(i) {
-  #     rst.mk <- overlay(rst.wht, fun = function(x) {
-  #       mk <- MannKendall(as.numeric(x))
-  #       if (mk$sl >= i) return(NA) else return(mk$tau)
-  #     }, filename = paste("out/MK", i, toupper(h), 
-  #                         unique(substr(names(rst.wht), 1, 21)), sep = "_"), 
-  #     format = "GTiff", overwrite = TRUE)
-  #     
-  #     fls.mk <- list.files("out", pattern = paste(i, toupper(h), ".tif$", sep = ".*"), 
-  #                          full.names = TRUE)
-  #     rst.mk <- raster(fls.mk)
-  #     
-  #     png(paste0(substr(fls.mk, 1, nchar(fls.mk)-4), ".png"), units = "mm", 
-  #         width = 300, res = 300, pointsize = 20)
-  #     print(spplot(rst.mk, scales = list(draw = TRUE), xlab = "x", ylab = "y", 
-  #                  col.regions = colorRampPalette(brewer.pal(11, "BrBG")), 
-  #                  sp.layout = list("sp.lines", rasterToContour(dem)), 
-  #                  par.settings = list(fontsize = list(text = 15)), 
-  #                  at = seq(-.9, .9, .1)))
-  #     dev.off()
-  #     
-  #     val <- round(sum(!is.na(rst.mk[]))/ncell(rst.mk), digits = 3)
-  #     
-  #     val.pos <- round(sum(rst.mk[] > 0, na.rm = TRUE) / sum(!is.na(rst.mk[])), 3)
-  #     val.neg <- round(sum(rst.mk[] < 0, na.rm = TRUE) / sum(!is.na(rst.mk[])), 3)
-  #     
-  #     return(data.frame(sensor = h, p = as.character(i), nona = val, 
-  #                       nona_pos = val.pos, nona_neg = val.neg))
-  #   })
-  #   
-  #   return(do.call("rbind", stats))
-})
+}
 
 # Store percentage information about significant NDVI pixels
 write.csv(do.call("rbind", stats), "out/mk_na_stats.csv", row.names = FALSE)
