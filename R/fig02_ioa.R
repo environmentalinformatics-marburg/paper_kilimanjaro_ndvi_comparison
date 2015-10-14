@@ -1,15 +1,19 @@
 ### environmental stuff
 
 ## packages
-lib <- c("grid", "Rsenal", "foreach", "latticeExtra", "ggplot2")
+lib <- c("grid", "Rsenal", "doParallel", "latticeExtra", "ggplot2")
 jnk <- sapply(lib, function(x) library(x, character.only = TRUE))
 
 ## functions
 source("R/visDEM.R")
 source("R/visIOA.R")
 
+## parallelization
+cl <- makeCluster(3)
+registerDoParallel(cl)
+
 ## folders
-ch_dir_extdata <- "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/data/"
+ch_dir_extdata <- "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/data/rst/"
 ch_dir_outdata <- "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/out/"
 
 ### data processing
@@ -34,28 +38,72 @@ num_xmax <- xmax(rst_ndvi)
 num_ymin <- ymin(rst_ndvi)
 num_ymax <- ymax(rst_ndvi)
 
-## index of association (ioa; 2003-2013)
+## index of association (ioa; 2003-2012)
 st_year <- "2003"
 nd_year <- "2012"
 
-ls_ndvi <- lapply(c("mod13q1", "myd13q1", "gimms"), function(i) {
-                  
-  fls_ndvi <- list.files(paste0(ch_dir_extdata, "ioa/", i), 
-                         pattern = ".tif$", full.names = TRUE)
+## avl products and corresponding file patterns
+products <- c("GIMMS3g", 
+              "MOD13Q1.005", "MYD13Q1.005", 
+              "MOD13Q1.006", "MYD13Q1.006")
+
+pattern <- paste(c("^MVC_WHT", "^SCL_AGGMAX_WHT", "^SCL_AGGMAX_WHT", "^MVC", "^MVC"), 
+                 ".tif$", sep = ".*")
+
+## import data
+ls_rst_ndvi <- foreach(i = products, j = pattern, .packages = "raster") %dopar% {
+    
+  # list avl files              
+  fls_ndvi <- list.files(paste0(ch_dir_extdata, i), 
+                         pattern = j, full.names = TRUE, recursive = TRUE)
   
+  # create temporal subset
   st <- grep(st_year, fls_ndvi)[1]
   nd <- grep(nd_year, fls_ndvi)[length(grep(nd_year, fls_ndvi))]
   
+  # import data
   fls_ndvi <- fls_ndvi[st:nd]
   rst_ndvi <- stack(fls_ndvi)
   
-  if (i == "gimms") {
+  if (i == "GIMMS3g") {
     spy <- rasterToPolygons(rst_ndvi[[1]])
     rst_ndvi <- crop(rst_ndvi, spy)
   }
   
   return(rst_ndvi)
-})
+}
+
+## calculate ioa
+dat_ioa <- foreach(i = 1:length(ls_rst_ndvi), .combine = "rbind", 
+                   .packages = c("foreach", "raster", "Rsenal")) %dopar% {
+  foreach(j = i:length(ls_rst_ndvi), .combine = "rbind") %do% {
+    
+    rst1 <- ls_rst_ndvi[[i]]
+    
+    # resample modis
+    rst2 <- if (i == 1 & j != 1) {
+      resample(ls_rst_ndvi[[j]], rst1)
+    } else {
+      ls_rst_ndvi[[j]]
+    }
+    
+    # extract values
+    val1 <- rst1[]
+    val2 <- rst2[]
+    
+    # calculate ioa
+    if (i == j) {
+      val_ioa <- 1
+    } else {
+      val_ioa <- mean(sapply(1:nrow(val1), function(k) {
+        Rsenal:::ioaC(val1[k, ], val2[k, ])
+      }))
+    }
+    data.frame(ref1 = products[i], ref2 = products[j], ioa = val_ioa)  
+  }
+}
+
+save(dat_ioa, file = "data/ioa.RData")
 
 p_ioa <- foreach(i = list(ls_ndvi[[1]], ls_ndvi[[1]], ls_ndvi[[2]]), 
                  j = list(ls_ndvi[[2]], ls_ndvi[[3]], ls_ndvi[[3]]), 
