@@ -1,4 +1,4 @@
-visKili <- function(lwd = 2, col = "black", fill = "white", cex = 2) {
+visKili <- function(lwd = 2, cex = 2, ext = NULL) {
   
   library(rworldmap)
   library(Rsenal)
@@ -12,7 +12,11 @@ visKili <- function(lwd = 2, col = "black", fill = "white", cex = 2) {
   spy_tanzania <- subset(countriesCoarse, POSTAL == "TZ")
   
   ## kilimanjaro
-  rst_kili <- kiliAerial(projection = proj4string(spy_africa), rasterize = TRUE)
+  if (is.null(ext)) {
+    rst_kili <- kiliAerial(projection = proj4string(spy_africa), rasterize = TRUE)
+  } else {
+    rst_kili <- ext
+  }
   
   spt_kili <- data.frame(x = (xmin(rst_kili) + xmax(rst_kili)) / 2, 
                          y = (ymin(rst_kili) + ymax(rst_kili)) / 2)
