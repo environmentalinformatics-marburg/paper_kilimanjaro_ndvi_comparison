@@ -85,9 +85,14 @@ fls_mk05 <- list.files(ch_dir_outdata, pattern = "mk05_0312.tif$",
                        full.names = TRUE)
 rst_mk05 <- lapply(fls_mk05, raster)
 
+###
+rst_mk05[[3]] <- crop(rst_mk05[[3]], rst_mk05[[2]], filename = fls_mk05[3], overwrite = TRUE)
+rst_mk05[[5]] <- crop(rst_mk05[[5]], rst_mk05[[4]], filename = fls_mk05[5], overwrite = TRUE)
+###
+
+# trend differences
 df_mk_stats <- foreach(i = rst_mk05, .combine = "rbind") %do% mkStats(i)
 df_mk_stats <- cbind(product = products, df_mk_stats)
-
 
 # mean difference
 meanDifference(rst_mk05[[2]], rst_mk05[[4]]) # MOD13Q1.005 vs. MYD13Q1.005
@@ -112,7 +117,7 @@ p_bing <- spplot(rst_kili[[1]], col.regions = NA, colorkey = FALSE,
                                y = list(at = seq(-2.9, -3.3, -.2))))
 
 # visualize topographic map
-p_topo <- visKili(cex = .5, lwd = .05)
+p_topo <- visKili(cex = .5, lwd = .05, ext = rst_ndvi)
 
 
 ################################################################################
@@ -183,6 +188,11 @@ vp_rect <- viewport(x = .365, y = .6635, height = .315, width = .15,
                     just = c("left", "bottom"))
 pushViewport(vp_rect)
 print(p_topo, newpage = FALSE)
+
+# add equator label
+downViewport(trellis.vpname("figure"))
+grid.text(x = .05, y = .38, just = c("left", "bottom"), label = "Eq.", 
+          gp = gpar(cex = .3))
 
 dev.off()
 
