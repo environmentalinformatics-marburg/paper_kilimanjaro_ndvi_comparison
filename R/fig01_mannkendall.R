@@ -1,8 +1,11 @@
 ### environmental stuff
 
+## clear workspace
+rm(list = ls(all = TRUE))
+
 ## packages
 lib <- c("grid", "Rsenal", "doParallel", "latticeExtra", "ggplot2", 
-         "OpenStreetMap", "Orcs")
+         "OpenStreetMap", "Orcs", "stargazer")
 jnk <- sapply(lib, function(x) library(x, character.only = TRUE))
 
 ## functions
@@ -72,7 +75,8 @@ p_mk <- foreach(i = products, txt = label, .packages = lib) %dopar% {
                       xlim = c(num_xmin, num_xmax), 
                       ylim = c(num_ymin, num_ymax), 
                       scales = list(draw = TRUE, cex = .5, 
-                                    y = list(at = seq(-2.9, -3.3, -.2))))
+                                    y = list(at = seq(-2.9, -3.3, -.2))), 
+                      rewrite = TRUE)
   
   p <- p + as.layer(p_dem)
   p <- envinmrRasterPlot(p, rot = 90, height = .5, width = .4, key.cex = .7)
@@ -85,14 +89,18 @@ fls_mk05 <- list.files(ch_dir_outdata, pattern = "mk05_0312.tif$",
                        full.names = TRUE)
 rst_mk05 <- lapply(fls_mk05, raster)
 
-###
-rst_mk05[[3]] <- crop(rst_mk05[[3]], rst_mk05[[2]], filename = fls_mk05[3], overwrite = TRUE)
-rst_mk05[[5]] <- crop(rst_mk05[[5]], rst_mk05[[4]], filename = fls_mk05[5], overwrite = TRUE)
-###
-
 # trend differences
 df_mk_stats <- foreach(i = rst_mk05, .combine = "rbind") %do% mkStats(i)
 df_mk_stats <- cbind(product = products, df_mk_stats)
+
+# reformat
+df_mk_stats[, 1] <- as.character(df_mk_stats[, 1])
+rownames(df_mk_stats) <- df_mk_stats[, 1]
+df_mk_stats <- df_mk_stats[, -c(1, 4, 6)]
+names(df_mk_stats) <- c("Trend pixels", "Trends (%)", "Greening (%)", "Browning (%)")
+rownames(df_mk_stats)[1] <- "GIMMS NDVI3g"
+
+stargazer(df_mk_stats, summary = FALSE)
 
 # mean difference
 meanDifference(rst_mk05[[2]], rst_mk05[[4]]) # MOD13Q1.005 vs. MYD13Q1.005

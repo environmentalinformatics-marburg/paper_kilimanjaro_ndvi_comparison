@@ -33,7 +33,6 @@ dat_mk05_gimms <- rbind(cbind(dat_mk05_gimms[, 1:2], collection = "005"),
 ## density plot
 
 # collection 005
-cols <- brewer.pal(9, "RdBu")[c(3, 7, 9)]
 cols <- envinmrPalette(5)[c(3, 2, 5)]
 ltys <- c("solid", "solid", "longdash")
 names(ltys) <- names(cols) <- unique(dat_mk05$product)

@@ -8,7 +8,7 @@ visMannKendall <- function(rst,
                            crs = NULL, 
                            xlab = "x", ylab = "y", scales = list(draw = TRUE),
                            xlim = bbox(rst)[1, ], ylim = bbox(rst)[2, ],
-                           filename = "", ...) {
+                           filename = "", rewrite = FALSE, ...) {
   
   lib <- c("raster", "Kendall", "rasterVis", "RColorBrewer")
   sapply(lib, function(x) library(x, character.only = TRUE))
@@ -17,16 +17,16 @@ visMannKendall <- function(rst,
   if (is.null(col.regions))
     col.regions <- colorRampPalette(brewer.pal(11, "BrBG"))
   
-  if (file.exists(filename)) {
-    cat("File found.\n")
+  if (file.exists(filename) & !rewrite) {
+    cat("Files found, working with existing files.\n")
     ndvi.mk <- raster(filename)
   } else {
-    cat("File not found.\n")
+    cat("Files in, start processing.\n")
     
     # Mann-Kendall tau
     if (is.null(p_value)) {
       ndvi.mk <- overlay(rst, fun = function(x) MannKendall(x)$tau, 
-                         filename = filename, ...)
+                         filename = filename, overwrite = overwrite, ...)
       
     } else {
       # Mann-Kendall tau of significant pixels only
