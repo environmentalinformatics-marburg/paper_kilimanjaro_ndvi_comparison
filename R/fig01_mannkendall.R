@@ -86,7 +86,7 @@ p_mk <- foreach(i = products, txt = label, .packages = lib) %dopar% {
 
 ## statistics
 fls_mk05 <- list.files(ch_dir_outdata, pattern = "mk05_0312.tif$", 
-                       full.names = TRUE)
+                       full.names = TRUE)[c(1, 2, 4, 3, 5)]
 rst_mk05 <- lapply(fls_mk05, raster)
 
 # trend differences
@@ -103,8 +103,73 @@ rownames(df_mk_stats)[1] <- "GIMMS NDVI3g"
 stargazer(df_mk_stats, summary = FALSE)
 
 # mean difference
-meanDifference(rst_mk05[[2]], rst_mk05[[4]]) # MOD13Q1.005 vs. MYD13Q1.005
-meanDifference(rst_mk05[[3]], rst_mk05[[5]]) # MOD13Q1.006 vs. MYD13Q1.006
+## calculate ioa
+dat_meandiff <- foreach(i = 1:length(rst_mk05), .combine = "rbind") %do% {
+  
+  foreach(j = 1:length(rst_mk05), .combine = "rbind") %do% {
+            
+            # if stacks are identical, ioa equals 1        
+            if (i == j) {
+              val_meandiff <- 0
+            } else {
+              
+              rst1 <- rst_mk05[[i]]
+              
+              # resample modis
+              if (i == 1 & j != 1) {
+                rst2 <- resample(rst_mk05[[j]], rst1)
+              } else {
+                rst2 <- rst_mk05[[j]]
+                
+                if (i != 1 & j == 1) 
+                  rst1 <- resample(rst1, rst2)
+              }
+              
+              # extract values
+              val1 <- rst1[]
+              val2 <- rst2[]
+              
+              # calculate mean difference
+              val_meandiff <- Orcs::meanDifference(val1, val2)
+            }
+            
+            data.frame(ref1 = products[i], ref2 = products[j], 
+                       md = val_meandiff)  
+          }
+}
+save(dat_meandiff, file = "data/meandiff.RData")
+
+mat_meandiff <- matrix(ncol = length(products), nrow = length(products))
+rst_meandiff <- raster(ncols = length(products), nrows = length(products), 
+                       xmn = 0, xmx = 5, ymn = 0, ymx = 5)
+for (i in 1:length(products)) {
+  sub <- subset(dat_meandiff, ref1 == rev(products)[i])
+  mat_meandiff[i, ] <- sub$md
+}
+
+rst_meandiff <- raster(mat_meandiff, xmn = 0, xmx = 5, ymn = 0, ymx = 5)
+rst_meandiff[seq(5, ncell(rst_meandiff), 4)] <- NA
+
+txt <- c(expression("NDVI"['3g']), 
+         expression("NDVI"['Terra-C5']), expression("NDVI"['Aqua-C5']), 
+         expression("NDVI"['Terra-C6']), expression("NDVI"['Aqua-C6']))
+cols <- colorRampPalette(brewer.pal(11, "RdBu"))
+p_meandiff <- 
+  spplot(rst_meandiff, col.regions = cols(100), at = seq(-.125, .125, .025), 
+         scales = list(draw = TRUE, at = seq(.5, 4.5, 1), labels = txt, 
+                       cex = .8, x = list(rot = 45)), 
+         colorkey = list(space = "top", labels = list(cex = .8), width = .7)) + 
+  latticeExtra::layer(sp.polygons(rasterToPolygons(rst_meandiff)))
+
+png(paste0(ch_dir_outdata, "figure02.png"), width = 10.5, height = 12, 
+    units = "cm", res = 500)
+print(p_meandiff)
+dev.off()
+
+tiff(paste0(ch_dir_outdata, "figure02.tiff"), width = 10.5, height = 12, 
+     units = "cm", res = 500, compression = "lzw")
+print(p_meandiff)
+dev.off()
 
 ## study area
 osm_kili <- openproj(openmap(upperLeft = c(num_ymax, num_xmin), 
