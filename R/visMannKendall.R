@@ -11,7 +11,7 @@ visMannKendall <- function(rst,
                            filename = "", rewrite = FALSE, ...) {
   
   lib <- c("raster", "Kendall", "rasterVis", "RColorBrewer")
-  sapply(lib, function(x) library(x, character.only = TRUE))
+  jnk <- sapply(lib, function(x) library(x, character.only = TRUE))
   
   # Colors
   if (is.null(col.regions))
@@ -25,17 +25,20 @@ visMannKendall <- function(rst,
     
     # Mann-Kendall tau
     if (is.null(p_value)) {
-      ndvi.mk <- overlay(rst, fun = function(x) MannKendall(x)$tau, 
-                         filename = filename, overwrite = overwrite, ...)
+      ndvi.mk <- overlay(rst, fun = function(x) {
+        Rsenal::significantTau(x, p = 1, prewhitening = TRUE)
+      }, filename = filename, overwrite = TRUE, ...)
       
     } else {
       # Mann-Kendall tau of significant pixels only
       ndvi.mk <- overlay(rst, fun = function(x) {
-        mk <- MannKendall(x)
-        if (mk$sl >= p_value) return(NA) else return(mk$tau)
-      }, filename = filename, ...)
+        Rsenal::significantTau(x, p = p_value, prewhitening = TRUE)
+      }, filename = filename, overwrite = TRUE, ...)
     }
   }
+  
+  ## status message
+  cat("minValue:", minValue(ndvi.mk), "maxValue:", maxValue(ndvi.mk), "\n")
   
   if (!is.null(crs)) {
     ndvi.mk <- projectRaster(ndvi.mk, crs = crs, method = "ngb")
@@ -49,15 +52,5 @@ visMannKendall <- function(rst,
          par.settings = list(fontsize = list(text = 15)), 
          at = at, alpha.regions = alpha.regions, 
          colorkey = list(labels = list(cex = keycex)))
-  
-  #   levelplot(ndvi.mk, scales = list(draw = TRUE), xlab = "x", ylab = "y", 
-  #             col.regions = colorRampPalette(brewer.pal(11, "BrBG")), 
-  #             par.settings = list(fontsize = list(text = 15)), 
-  #             at = seq(-1, 1, .2), margin = FALSE, 
-  #             xscale.components = xscale.components.default, 
-  #             yscale.components = yscale.components.default) + 
-  #     as.layer(contourplot(dem, at = seq(1000, 5000, 500), 
-  #                          labels = list(labels = labels, col = "grey75"), 
-  #                          label.style = "mixed"))
   
 }

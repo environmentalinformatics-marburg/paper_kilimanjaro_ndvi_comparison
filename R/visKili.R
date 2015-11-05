@@ -32,6 +32,6 @@ visKili <- function(lwd = 2, cex = 2, ext = NULL) {
     latticeExtra::layer(panel.refline(h = 0, col = "grey60", lty = 2, lwd = .5)) + 
     latticeExtra::layer(sp.polygons(spy_tanzania, fill = "grey50", col = "transparent"), 
                         data = list(spy_tanzania = spy_tanzania)) + 
-    latticeExtra::layer(sp.points(spt_kili, col = "black", pch = 24, cex = .5, fill = "white"), 
-                        data = list(spt_kili = spt_kili))
+    latticeExtra::layer(sp.points(spt_kili, col = "black", pch = 24, cex = cex, fill = "white"), 
+                        data = list(spt_kili = spt_kili, cex = cex))
 }
