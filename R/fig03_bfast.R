@@ -22,87 +22,84 @@ ch_dir_outdata <- "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/out/"
 st_year <- 2003
 nd_year <- 2012
 
-## start processing single products...
-ch_dir_ndvi <- list.dirs(ch_dir_extdata, full.names = TRUE, recursive = FALSE)
-ls_bfast <- lapply(ch_dir_ndvi, function(h) {
-
-  # adjust search pattern (gimms required no scaling)
-  pttrn <- if (basename(h) == "GIMMS3g") "^MVC_.*.tif$" else "^SCL_.*.tif$"
-
-  # search for available files
-  fls_scl <- list.files(h, recursive = TRUE,
-                        pattern = pttrn, full.names = TRUE)
-
-  # subset available files by start and end year
-  st <- grep(st_year, fls_scl)[1]
-  nd <- grep(nd_year, fls_scl)[length(grep(nd_year, fls_scl))]
-  fls_scl <- fls_scl[st:nd]
-
-  # import data
-  rst_ndvi <- stack(fls_scl)
-  mat_ndvi <- as.matrix(rst_ndvi)
-
-  # breakpoint detection
-  suppressWarnings(
-    df_bp <- foreach(i = 1:nrow(mat_ndvi), .packages = "bfast", 
-                     .combine = "rbind.fill", .export = ls(envir = globalenv())) %dopar% {
-                     
-      # bfast                 
-      num_val <- mat_ndvi[i, ]
-      ts_val <- ts(num_val, start = c(st_year, 1), end = c(nd_year, 12), frequency = 12)
-      bf_val <- bfast(ts_val, season = "harmonic", max.iter = 10)
-      
-      # trend (vt) breakpoints
-      num_bp_vt <- bf_val$output[[length(bf_val$output)]]$Vt.bp
-      num_bp_vt_ct <- ifelse(!bf_val$nobp$Vt, 
-                             length(num_bp_vt), 
-                             0)
-      
-      if (num_bp_vt_ct > 0) {
-        
-        # times of trend breakpoints
-        num_bp_vt_dt <- time(ts_val)[num_bp_vt]
-        df_bp_vt_dt <- data.frame(matrix(num_bp_vt_dt, byrow = TRUE, nrow = 1))
-        names(df_bp_vt_dt) <- paste0("bp_vt_", formatC(1:length(num_bp_vt_dt), width = 2, flag = "0"))
-        df_bp_vt_dt <- data.frame("bp_vt_ct" = num_bp_vt_ct, df_bp_vt_dt)
-        
-        # time and magnitude of biggest change detected
-        num_bp_vt_maxtime <- bf_val$Time
-        num_bp_vt_maxtime <- time(ts_val)[num_bp_vt_maxtime]
-        num_bp_vt_maxmagn <- bf_val$Magnitude
-        df_bp_vt_max <- data.frame("bp_vt_maxtime" = num_bp_vt_maxtime, 
-                                   "bp_vt_maxmagn" = num_bp_vt_maxmagn)
-        
-        df_bp_vt <- cbind(df_bp_vt_dt, df_bp_vt_max)
-        
-      } else {
-        df_bp_vt <- data.frame(row.names = 1)
-      } 
-      
-      # seasonal (wt) breakpoints
-      num_bp_wt <- bf_val$output[[length(bf_val$output)]]$Wt.bp
-      num_bp_wt_ct <- ifelse(!bf_val$nobp$Wt, 
-                             length(num_bp_wt), 
-                             0)
-      
-      if (num_bp_wt_ct > 0) {
-        
-        # times of seasonal breakpoints
-        num_bp_wt_dt <- time(ts_val)[num_bp_wt]
-        df_bp_wt_dt <- data.frame(matrix(num_bp_wt_dt, byrow = TRUE, nrow = 1))
-        names(df_bp_wt_dt) <- paste0("bp_wt_", formatC(1:length(num_bp_wt_dt), width = 2, flag = "0"))
-        df_bp_wt_dt <- data.frame("bp_wt_ct" = num_bp_wt_ct, df_bp_wt_dt)
-        
-      } else {
-        df_bp_wt_dt <- data.frame(row.names = 1)
-      }
-      
-      # return data
-      data.frame(cell = i, df_bp_vt, df_bp_wt_dt, 
-                 row.names = "")
-    }
-  )
+## reimport data
+fls_bfast <- list.files("data/", pattern = "_bfast.rds$", full.names = TRUE)
+lst_bfast <- vector("list", length(fls_bfast))
+for (i in 1:length(fls_bfast)) {
   
-  # return concatenated data
-  return(df_bp)
-})
+  # import .rds file
+  dat_tmp <- readRDS(fls_bfast[[i]])
+  
+  # identify and remove missing data (due to missing values)
+  log_isdf <- sapply(dat_tmp, function(j) {
+    is.data.frame(j)
+  })
+  if (any(!log_isdf))
+    dat_tmp <- dat_tmp[log_isdf]
+  
+  # write to list
+  lst_bfast[[i]] <- do.call("rbind.fill", dat_tmp)
+  rm(dat_tmp)
+}
+
+
+### bfast value insertion
+
+## raster templates
+rst_tmp_gimms <- raster(paste0(ch_dir_extdata, "GIMMS3g/whittaker_dsn/DSN_MVC_WHT_TRM_PRJ_CRP_geo198201.tif"))
+rst_tmp_gimms[] <- NA
+rst_bfast_gimms <- rst_bfast_gimms_maxtime <- rst_bfast_gimms_maxmagn <- rst_tmp_gimms
+
+rst_tmp_modis <- raster(paste0(ch_dir_extdata, "MYD13Q1.006/whittaker_dsn/DSN_SCL_MVC_200301.tif"))
+rst_tmp_modis[] <- NA
+rst_bfast_modis <- rst_bfast_modis_maxtime <- rst_bfast_modis_maxmagn <- rst_tmp_modis
+
+## insert values
+rst_bfast_gimms[lst_bfast[[1]]$cell] <- lst_bfast[[1]]$bp_vt_ct
+
+lst_p <- foreach(i = lst_bfast, j = 1:length(lst_bfast)) %do% {
+  
+  # templates
+  if (j == 1) {
+    rst_bp <- rst_maxmagn <- rst_maxtime <- rst_bfast_gimms
+  } else {
+    rst_bp <- rst_maxmagn <- rst_maxtime <- rst_bfast_modis
+  }
+  
+  # insert values
+  rst_bp[i$cell] <- i$bp_vt_ct
+  rst_maxmagn[i$cell] <- i$bp_vt_maxmagn
+  rst_maxtime[i$cell] <- i$bp_vt_maxtime
+  
+  # reject pixels with low magnitude
+  int_lowmagn <- which(rst_maxmagn[] < .1 & rst_maxmagn[] > -.1)
+  rst_bp[int_lowmagn] <- rst_maxmagn[int_lowmagn] <- rst_maxtime[int_lowmagn] <- NA
+  
+  # number of breakpoints
+  cols <- colorRampPalette(brewer.pal(5, "RdPu"))
+  p_bp <- spplot(rst_bp, scales = list(draw = TRUE), at = 0.5:5.5, 
+                 col.regions = cols(10), colorkey = list(space = "top"))
+
+  # maximum magnitude
+  cols <- colorRampPalette(rev(brewer.pal(6, "RdBu")))
+  p_maxmagn <- spplot(rst_maxmagn, scales = list(draw = TRUE), 
+                      at = seq(-.6, .6, .1), col.regions = cols(12), 
+                      colorkey = list(space = "top"))
+  
+  # timing of maximum magnitude
+  col_month_max <- data.frame(cell = 1:10, 
+                              h = -360/12 + 1:10 * 360/12, 
+                              l = 80,
+                              c = 65)
+  
+  p_maxtime <- spplot(rst_maxtime, scales = list(draw = TRUE), at = 2003:2012, 
+                      col.regions = hcl(h = col_month_max$h, c = 70, l = 65), 
+                      colorkey = list(space = "top"))
+  
+  # return artworks
+  return(list(p_bp, p_maxmagn, p_maxtime))
+}
+
+p_bp <- latticeCombineGrid(lapply(lst_p, "[[", 1), layout = c(1, 5))
+p_maxmagn <- latticeCombineGrid(lapply(lst_p, "[[", 2), layout = c(1, 5))
+p_maxtime <- latticeCombineGrid(lapply(lst_p, "[[", 3), layout = c(1, 5))
