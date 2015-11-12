@@ -5,7 +5,7 @@ rm(list = ls(all = TRUE))
 
 ## packages
 lib <- c("grid", "Rsenal", "doParallel", "latticeExtra", "ggplot2", 
-         "OpenStreetMap", "Orcs", "stargazer")
+         "Orcs", "stargazer")
 jnk <- sapply(lib, function(x) library(x, character.only = TRUE))
 
 ## functions
@@ -43,6 +43,26 @@ num_xmax <- xmax(rst_ndvi)
 num_ymin <- ymin(rst_ndvi)
 num_ymax <- ymax(rst_ndvi)
 
+## study area
+rst_kili <- kiliAerial(upperLeft = c(num_ymax, num_xmin), 
+                       lowerRight = c(num_ymin, num_xmax),
+                       minNumTiles = 12L, rasterize = TRUE, 
+                       projection = "+init=epsg:4326")
+
+
+# create figure
+p_bing <- spplot(rst_kili[[1]], col.regions = NA, colorkey = FALSE, 
+                 sp.layout = list(rgb2spLayout(rst_kili, alpha = .8), 
+                                  list("sp.text", loc = c(37.02, -3.35), 
+                                       txt = "a)", font = 2, cex = .6, adj = c(.1, 1))),
+                 xlim = c(num_xmin, num_xmax), 
+                 ylim = c(num_ymin, num_ymax), 
+                 scales = list(draw = TRUE, cex = .5, 
+                               y = list(at = seq(-2.9, -3.3, -.2))))
+
+## topographic map
+p_topo <- visKili(cex = .5, lwd = .05, ext = rst_ndvi)
+
 ## mann-kendall trend tests (2003-2012; p < 0.05)
 st_year <- "2003"
 nd_year <- "2012"
@@ -57,99 +77,101 @@ labels <- list(expression(bold("b) NDVI"["3g"])),
                expression(bold("e) NDVI"["Terra-C6"])), 
                expression(bold("f) NDVI"["Aqua-C6"])))
 
-## breaks (works only when mann-kendall trend layers already exist)
-fls_mk <- list.files(ch_dir_outdata, pattern = "mk05_0312", 
-                     full.names = TRUE)
-lst_mk <- lapply(fls_mk, raster)
-
+# ## breaks (works only when mann-kendall trend layers already exist)
+# fls_mk <- list.files(ch_dir_outdata, pattern = "mk_0312_tau05", 
+#                      full.names = TRUE)
+# lst_mk <- lapply(fls_mk, raster)
+# 
 # sapply(lst_mk, function(i) {
 #   cat("Minimum:", minValue(i), "\tMaximum:", maxValue(i), "\n")
-#   invisible(return())
+#   return(invisible(NULL))
 # })
 
 ## create and visualize mann-kendall trend layers
-p_mk <- foreach(i = products, txt = labels) %do% {
+lst_p_mk <- lapply(c(.05, .001), function(p_value) {
+  # status message
+  cat("Processing p =", p_value, "\n")
   
-  fls_ndvi <- list.files(paste0(ch_dir_extdata, i), recursive = TRUE,
-                         pattern = "^DSN_.*.tif$", full.names = TRUE)
+  if (p_value == 0.05) {
+    labels <- list(expression(bold("b) NDVI"["3g"])), 
+                   expression(bold("c) NDVI"["Terra-C5"])), 
+                   expression(bold("d) NDVI"["Aqua-C5"])), 
+                   expression(bold("e) NDVI"["Terra-C6"])), 
+                   expression(bold("f) NDVI"["Aqua-C6"])))
+  } else {
+    labels <- list(expression(bold("x) NDVI"["3g"])), 
+                   expression(bold("a) NDVI"["Terra-C5"])), 
+                   expression(bold("b) NDVI"["Aqua-C5"])), 
+                   expression(bold("c) NDVI"["Terra-C6"])), 
+                   expression(bold("d) NDVI"["Aqua-C6"])))
+  }
   
-  st <- grep(st_year, fls_ndvi)[1]
-  nd <- grep(nd_year, fls_ndvi)[length(grep(nd_year, fls_ndvi))]
+  foreach(i = products, txt = labels, 
+          .export = ls(envir = environment())) %do% {
+    
+    fls_ndvi <- list.files(paste0(ch_dir_extdata, i), recursive = TRUE,
+                           pattern = "^DSN_.*.tif$", full.names = TRUE)
+    
+    st <- grep(st_year, fls_ndvi)[1]
+    nd <- grep(nd_year, fls_ndvi)[length(grep(nd_year, fls_ndvi))]
+    
+    fls_ndvi <- fls_ndvi[st:nd]
+    rst_ndvi <- stack(fls_ndvi)
+    
+    p <- visMannKendall(rst = rst_ndvi, dem = rst_dem, max_ele = 4000,
+                        
+                        xlab = "", ylab = "",
+                        p_value = p_value, crs = "+init=epsg:4326",
+                        filename = paste0(ch_dir_outdata, i, "_mk_0312.tif"), 
+                        at = seq(-.55, .55, .01), cores = 3L, 
+                        format = "GTiff", overwrite = TRUE, 
+                        sp.layout = list("sp.text", loc = c(37.04, -3.35), 
+                                         txt = txt, font = 2, cex = .6, adj = c(.1, 1)), 
+                        xlim = c(num_xmin, num_xmax), 
+                        ylim = c(num_ymin, num_ymax), 
+                        scales = list(draw = TRUE, cex = .5, 
+                                      y = list(at = seq(-2.9, -3.3, -.2))), 
+                        rewrite = FALSE)
+    
+    p <- p + as.layer(p_dem)
+    p <- envinmrRasterPlot(p, rot = 90, height = .5, width = .4, key.cex = .7)
+    
+    return(p)
+  }
+})
   
-  fls_ndvi <- fls_ndvi[st:nd]
-  rst_ndvi <- stack(fls_ndvi)
   
-  p <- visMannKendall(rst = rst_ndvi, dem = rst_dem, xlab = "", ylab = "",
-                      p_value = .001, crs = "+init=epsg:4326",
-                      filename = paste0(ch_dir_outdata, i, "_mk_0312.tif"), 
-                      at = seq(-.875, .875, .0875), cores = 3L, 
-                      format = "GTiff", overwrite = TRUE, 
-                      sp.layout = list("sp.text", loc = c(37.04, -3.35), 
-                                       txt = txt, font = 2, cex = .6, adj = c(.1, 1)), 
-                      xlim = c(num_xmin, num_xmax), 
-                      ylim = c(num_ymin, num_ymax), 
-                      scales = list(draw = TRUE, cex = .5, 
-                                    y = list(at = seq(-2.9, -3.3, -.2))), 
-                      rewrite = FALSE)
-  
-  p <- p + as.layer(p_dem)
-  p <- envinmrRasterPlot(p, rot = 90, height = .5, width = .4, key.cex = .7)
-  
-  return(p)
-}
-
-## study area
-osm_kili <- openproj(openmap(upperLeft = c(num_ymax, num_xmin), 
-                             lowerRight = c(num_ymin, num_xmax), 
-                             type = "bing", minNumTiles = 12L), 
-                     projection = "+init=epsg:4326")
-
-# visualize bing image
-rst_kili <- raster(osm_kili)
-
-p_bing <- spplot(rst_kili[[1]], col.regions = NA, colorkey = FALSE, 
-                 sp.layout = list(rgb2spLayout(rst_kili), 
-                                  list("sp.text", loc = c(37.02, -3.35), 
-                                       txt = "a)", font = 2, cex = .6, adj = c(.1, 1))),
-                 xlim = c(num_xmin, num_xmax), 
-                 ylim = c(num_ymin, num_ymax), 
-                 scales = list(draw = TRUE, cex = .5, 
-                               y = list(at = seq(-2.9, -3.3, -.2))))
-
-# visualize topographic map
-p_topo <- visKili(cex = .5, lwd = .05, ext = rst_ndvi)
-
-
 ################################################################################
 ### visualization ##############################################################
 ################################################################################
 
-## combination final figure
-p_mk_comb <- latticeCombineGrid(append(list(p_bing), p_mk), layout = c(2, 3))
+## combination final figure, p < 0.05
+p_mk_comb <- latticeCombineGrid(append(list(p_bing), lst_p_mk[[1]]), 
+                                layout = c(2, 3))
 
 # in-text png version
 ch_fls_png <- paste0(ch_dir_outdata, "figure01.png")
-png(ch_fls_png, width = 15.5, height = 19.5, units = "cm", res = 500)
+png(ch_fls_png, width = 20.5, height = 25, units = "cm", res = 500)
 plot.new()
 
 print(p_mk_comb, newpage = FALSE)
 
 # add key
-vp_key <- viewport(x = .5, y = .885,
+vp_key <- viewport(x = .5, y = .905,
                    height = 0.1, width = .8,
                    just = c("center", "bottom"),
                    name = "key.vp")
 pushViewport(vp_key)
 draw.colorkey(key = list(col = colorRampPalette(brewer.pal(11, "BrBG")), 
                          width = .6, height = .5,
-                         at = seq(-.875, .875, .0875), 
+                         at = seq(-.55, .55, .01), 
                          space = "bottom"), draw = TRUE)
-grid.text(expression("Kendall's " ~ tau), x = 0.5, y = 1, just = c("centre", "top"), 
+grid.text(expression("Kendall's " ~ tau), x = 0.5, y = .9, just = c("centre", "top"), 
           gp = gpar(font = 2, cex = .85))
 
 # add topographic map
 upViewport()
-vp_rect <- viewport(x = .365, y = .6635, height = .315, width = .15, 
+vp_rect <- viewport(x = .365, y = .6995, height = .315, width = .15, 
                     just = c("left", "bottom"))
 pushViewport(vp_rect)
 print(p_topo, newpage = FALSE)
@@ -163,28 +185,28 @@ dev.off()
 
 # standalone tiff version
 ch_fls_tif <- paste0(ch_dir_outdata, "figure01.tiff")
-tiff(ch_fls_tif, width = 15.5, height = 19.5, units = "cm", res = 500, 
+tiff(ch_fls_tif, width = 20.5, height = 25, units = "cm", res = 500, 
      compression = "lzw")
 plot.new()
 
 print(p_mk_comb, newpage = FALSE)
 
 # add key
-vp_key <- viewport(x = .5, y = .885,
+vp_key <- viewport(x = .5, y = .905,
                    height = 0.1, width = .8,
                    just = c("center", "bottom"),
                    name = "key.vp")
 pushViewport(vp_key)
 draw.colorkey(key = list(col = colorRampPalette(brewer.pal(11, "BrBG")), 
                          width = .6, height = .5,
-                         at = seq(-1, 1, .2), 
+                         at = seq(-.55, .55, .01), 
                          space = "bottom"), draw = TRUE)
-grid.text(expression("Kendall's " ~ tau), x = 0.5, y = 1, just = c("centre", "top"), 
+grid.text(expression("Kendall's " ~ tau), x = 0.5, y = .9, just = c("centre", "top"), 
           gp = gpar(font = 2, cex = .85))
 
 # add topographic map
 upViewport()
-vp_rect <- viewport(x = .365, y = .6635, height = .315, width = .15, 
+vp_rect <- viewport(x = .365, y = .6995, height = .315, width = .15, 
                     just = c("left", "bottom"))
 pushViewport(vp_rect)
 print(p_topo, newpage = FALSE)
@@ -196,15 +218,48 @@ grid.text(x = .05, y = .38, just = c("left", "bottom"), label = "Eq.",
 
 dev.off()
 
+################################################################################
+## combination final figure, p < 0.001
+################################################################################
+p_mk_comb <- latticeCombineGrid(lst_p_mk[[2]][2:5], 
+                                layout = c(2, 2))
+
+# in-text png version
+ch_fls_png <- paste0(ch_dir_outdata, "figure03.png")
+png(ch_fls_png, width = 20.5, height = 18, units = "cm", res = 500)
+plot.new()
+
+print(p_mk_comb, newpage = FALSE)
+
+# add key caption
+grid.text(bquote(bold("Kendall's " ~ tau)), x = 0.5, y = 1, 
+          just = c("centre", "top"), gp = gpar(font = 2, cex = .85))
+
+dev.off()
+
+# standalone tiff version
+ch_fls_tif <- paste0(ch_dir_outdata, "figure03.tiff")
+tiff(ch_fls_tif, width = 20.5, height = 18, units = "cm", res = 500, 
+     compression = "lzw")
+plot.new()
+
+print(p_mk_comb, newpage = FALSE)
+
+# add key caption
+grid.text(bquote(bold("Kendall's " ~ tau)), x = 0.5, y = 1, 
+          just = c("centre", "top"), gp = gpar(font = 2, cex = .85))
+
+dev.off()
+
 
 ################################################################################
 ## statistics
 ################################################################################
 
-# ## new product labels
-# labels <- list(expression("NDVI"["3g"]),    
-#                expression("NDVI"["Terra-C5"]), expression("NDVI"["Aqua-C5"]), 
-#                expression("NDVI"["Terra-C6"]), expression("NDVI"["Aqua-C6"]))
+## new product labels
+labels <- list(expression("NDVI"["3g"]),    
+               expression("NDVI"["Terra-C5"]), expression("NDVI"["Aqua-C5"]), 
+               expression("NDVI"["Terra-C6"]), expression("NDVI"["Aqua-C6"]))
 
 
 ## statistics (p < 0.001)
@@ -225,23 +280,23 @@ rownames(df_mk_stats)[1] <- "GIMMS NDVI3g"
 
 stargazer(df_mk_stats, summary = FALSE)
 
-# ## statistics (p < 0.05)
-# fls_mk05 <- list.files(ch_dir_outdata, pattern = "0312_tau05.tif$", 
-#                        full.names = TRUE)[c(1, 2, 4, 3, 5)]
-# rst_mk05 <- lapply(fls_mk05, raster)
-# 
-# # trend differences
-# df_mk_stats <- foreach(i = rst_mk05, .combine = "rbind") %do% mkStats(i)
-# df_mk_stats <- cbind(product = products, df_mk_stats)
-# 
-# # reformat
-# df_mk_stats[, 1] <- as.character(df_mk_stats[, 1])
-# rownames(df_mk_stats) <- df_mk_stats[, 1]
-# df_mk_stats <- df_mk_stats[, -c(1, 4, 6)]
-# names(df_mk_stats) <- c("Trend pixels", "Trends (%)", "Greening (%)", "Browning (%)")
-# rownames(df_mk_stats)[1] <- "GIMMS NDVI3g"
-# 
-# stargazer(df_mk_stats, summary = FALSE)
+## statistics (p < 0.05)
+fls_mk05 <- list.files(ch_dir_outdata, pattern = "0312_tau05.tif$", 
+                       full.names = TRUE)[c(1, 2, 4, 3, 5)]
+rst_mk05 <- lapply(fls_mk05, raster)
+
+# trend differences
+df_mk_stats <- foreach(i = rst_mk05, .combine = "rbind") %do% mkStats(i)
+df_mk_stats <- cbind(product = products, df_mk_stats)
+
+# reformat
+df_mk_stats[, 1] <- as.character(df_mk_stats[, 1])
+rownames(df_mk_stats) <- df_mk_stats[, 1]
+df_mk_stats <- df_mk_stats[, -c(1, 4, 6)]
+names(df_mk_stats) <- c("Trend pixels", "Trends (%)", "Greening (%)", "Browning (%)")
+rownames(df_mk_stats)[1] <- "GIMMS NDVI3g"
+
+stargazer(df_mk_stats, summary = FALSE)
 
 # mean difference
 ## calculate ioa
@@ -279,6 +334,7 @@ dat_meandiff <- foreach(i = 2:length(rst_mk001), .combine = "rbind") %do% {
   }
 }
 save(dat_meandiff, file = "data/meandiff.RData")
+load("data/meandiff.RData")
 
 products <- products[2:5]
 mat_meandiff <- matrix(ncol = length(products), nrow = length(products))
@@ -313,7 +369,7 @@ print(p_meandiff, newpage = FALSE)
 
 # key caption
 downViewport(trellis.vpname("figure"))
-grid.text(expression("MD"[tau]), x = 0.5, y = 1.3, just = c("centre", "bottom"), 
+grid.text(expression(bold("MD"[tau])), x = 0.5, y = 1.3, just = c("centre", "bottom"), 
           gp = gpar(font = 2, cex = .9))
 dev.off()
 
@@ -328,7 +384,7 @@ print(p_meandiff, newpage = FALSE)
 
 # key caption
 downViewport(trellis.vpname("figure"))
-grid.text(expression("MD"[tau]), x = 0.5, y = 1.3, just = c("centre", "bottom"), 
+grid.text(expression(bold("MD"[tau])), x = 0.5, y = 1.3, just = c("centre", "bottom"), 
           gp = gpar(font = 2, cex = .9))
 dev.off()
 
