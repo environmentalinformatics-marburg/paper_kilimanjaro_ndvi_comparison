@@ -4,15 +4,19 @@
 rm(list = ls(all = TRUE))
 
 # working directory
+# library(Orcs)
+# setwdOS(path_lin = "/media/fdetsch/XChange/", path_win = "D:/", 
+#         path_ext = "kilimanjaro/ndvi_comparison")
+
 library(Orcs)
-setwdOS(path_lin = "/media/fdetsch/XChange/", path_win = "D:/", 
+setwdOS(path_lin = "/media/fdetsch/modis_data/", path_win = "D:/", 
         path_ext = "kilimanjaro/ndvi_comparison")
 
 # packages
 # install.packages("MODIS", repos="http://R-Forge.R-project.org")
 lib <- c("raster", "rgdal", "MODIS", "doParallel", "Kendall", "RColorBrewer", 
          "reshape2", "ggplot2", "zoo", "GSODTools", "remote", "Rsenal")
-sapply(lib, function(...) require(..., character.only = TRUE))
+loadPkgs(lib)
 
 ## functions
 source("/media/permanent/repositories/paper_kilimanjaro_ndvi_comparison/R/qcMCD13.R")
@@ -35,30 +39,29 @@ MODISoptions(localArcPath = paste0(getwd(), "/data/MODIS_ARC/"),
 ## Extract .hdf container files for further processing
 for (i in c("MOD13Q1", "MYD13Q1")) {
 
-  runGdal(i, tileH = 21, tileV = 9, job = paste0(i, ".006"), 
-          begin = "2015-01-01",
-          collection = "006",
-          SDSstring = "100000000011", outProj = "EPSG:21037")
+  runGdal(i, tileH = 21, tileV = 9, job = paste0(i, ".005"), 
+          collection = "005",
+          SDSstring = "000000000010", outProj = "EPSG:21037")
 }
 
 ## geographic extent
-rst_kili <- kiliAerial(rasterize = TRUE, minNumTiles = 20)
+rst_kili <- kiliAerial(minNumTiles = 20L)
 
 ## plots
 shp_plots <- suppressWarnings(
-  readOGR(dsn = "data/shp/", 
+  readOGR(dsn = "/media/permanent/kilimanjaro/coordinates/coords/", 
           layer = "PlotPoles_ARC1960_mod_20140807_final", 
           p4s = "+init=epsg:21037"))
 shp_plots_amp <- subset(shp_plots, PoleType == "AMP")
 
 ## DEM
-rst_dem <- raster("data/dem/DEM_ARC1960_30m_Hemp.tif")
+rst_dem <- raster("/media/permanent/kilimanjaro/coordinates/coords/DEM_ARC1960_30m_Hemp.tif")
 
 ## NDVI data
 lst_ndvi_qc <- lapply(c("MOD13Q1", "MYD13Q1"), function(product) {
   qcMCD13(product, ref_ext = rst_kili, 
-          inpath = paste0(options()$MODIS_outDirPath, product, ".006"), 
-          dsn = paste0("data/rst/", product, ".006/"), 
+          inpath = paste0(options()$MODIS_outDirPath, product, ".005"), 
+          dsn = paste0("data/rst/", product, ".005/"), 
           cores = 3L, apply_crop = FALSE, apply_qc = FALSE, 
           apply_tso = FALSE, apply_adj = FALSE)
 })  
@@ -69,29 +72,62 @@ foreach(product = list("MOD13Q1", "MYD13Q1"),
         layers = lst_ndvi_qc, .packages = lib) %dopar% {
           
           ## initial files (for date information)
-          ndvi.fls.init <- list.files(paste0("data/MODIS_ARC/PROCESSED/", product, ".006"),
+          ndvi.fls.init <- list.files(paste0("data/MODIS_ARC/PROCESSED/", product, ".005"),
                                       pattern = paste(product, "NDVI.tif$", sep = ".*"), 
                                       full.names = TRUE, recursive = TRUE)
           
-          ## application of whittaker smoothing algorithm
-          rst.wht <- whittaker.raster(vi = layers, removeOutlier = TRUE, 
-                                      threshold = 2000,
-                                      timeInfo = orgTime(ndvi.fls.init, pillow = 0), 
-                                      lambda = 6000, nIter = 3, groupYears = FALSE, 
-                                      outDirPath = paste0("data/rst/", product, ".006/whittaker"), 
-                                      overwrite = TRUE, format = "raster")
+#           ## application of whittaker smoothing algorithm
+            drs_wht <- paste0("data/rst/", product, ".005/whittaker")
+            rst.wht <- whittaker.raster(vi = layers, removeOutlier = TRUE, 
+                                        threshold = 2000,
+                                        timeInfo = orgTime(ndvi.fls.init, pillow = 0), 
+                                        lambda = 6000, nIter = 3, groupYears = FALSE, 
+                                        outDirPath = drs_wht, 
+                                        overwrite = TRUE, format = "raster")
+            
           
-          ## monthly aggregation
+          # Application of scale factor and removal of inconsistent values
+          fls_wht <- list.files(drs_wht, pattern = "^MCD.*yL6000.ndvi.tif$", 
+                                full.names = TRUE)
+          rst_wht <- stack(fls_wht)
+          dir_scl <- paste0("data/rst/", product, ".005/whittaker_scl")
+          fls_scl <- paste0(dir_scl, "/SCL_", names(rst_wht))
+          
+          lst_scl <- foreach(i = unstack(rst_wht), j = as.list(fls_scl), 
+                             .packages = c("raster", "rgdal"), 
+                             .export = ls(envir = globalenv())) %dopar% {  
+                               
+                               # scale factor                   
+                               rst <- i
+                               rst <- rst / 10000
+                               
+                               # rejection of inconsistent values
+                               id <- which(rst[] < -1 | rst[] > 1)
+                               
+                               if (length(id) > 0) {
+                                 rst[id] <- NA
+                               }
+                               
+                               # store
+                               rst <- writeRaster(rst, filename = j, format = "GTiff", overwrite = TRUE)
+                               
+                               return(rst)
+                             }
+          
+          rst_scl <- stack(lst_scl)
+          
+          ## monthly aggregation (shifted scaling and mvc creation; remember to 
+          ## adjust this when running the script the next time)
           
           dates <- orgTime(ndvi.fls.init)$inputLayerDates
           dates_agg <- dates + 8
           yearmon_agg <- as.yearmon(dates_agg)
           indices_agg <- as.numeric(as.factor(yearmon_agg))
           
-          outdir <- paste0("data/rst/", product, "/whittaker")
+          outdir <- paste0("data/rst/", product, ".005/whittaker")
           
           # composite day of the year
-          fls_doy <- list.files(paste0("data/rst/", product, ".006/crp"), 
+          fls_doy <- list.files(paste0("data/rst/", product, ".005/crp"), 
                                 full.names = TRUE,
                                 pattern = paste0("^CRP_", toupper(product), ".*composite"))
           rst_doy <- stack(fls_doy)
@@ -101,46 +137,17 @@ foreach(product = list("MOD13Q1", "MYD13Q1"),
           months_doy <- unique(strftime(as.Date(as.character(dates_doy), 
                                                 format = "%Y%j"), "%Y%m"))
   
-          file_out <- paste0("data/rst/", product, ".006/whittaker_mvc/MVC")
+          file_out <- paste0("data/rst/", product, ".005/whittaker_mvc/MVC")
           
           # aggregate to maximum value composites (mvc)
-          rst_wht_mvc <- aggregateNDVICells(rst = stack(rst.wht), 
+          rst_wht_mvc <- aggregateNDVICells(rst = rst_scl, 
                                             rst_doy = rst_doy, 
                                             dates = dates_doy, 
-                                            n_cores = 3, 
+                                            cores = 3, 
                                             save_output = TRUE, filename = file_out, 
                                             bylayer = TRUE, suffix = months_doy, 
                                             format = "GTiff", overwrite = TRUE)
           
-  
-  # Application of scale factor and removal of inconsistent values
-  # fls_wht_aggmax <- list.files(outdir, pattern = "^AGGMAX_WHT", full.names = TRUE)
-  # rst_wht_aggmax <- stack(fls_wht_aggmax)
-  dir_scl <- paste0("data/rst/", h, ".006/whittaker_scl")
-  fls_scl <- paste0(dir_scl, "/SCL_", names(rst_wht_mvc))
-  
-  lst_scl <- foreach(i = unstack(rst_wht_mvc), j = as.list(fls_scl), 
-                     .packages = c("raster", "rgdal"), 
-                     .export = ls(envir = globalenv())) %dopar% {  
-                       
-    # scale factor                   
-    rst <- i
-    rst <- rst / 10000
-    
-    # rejection of inconsistent values
-    id <- which(rst[] < -1 | rst[] > 1)
-    
-    if (length(id) > 0) {
-      rst[id] <- NA
-    }
-    
-    # store
-    rst <- writeRaster(rst, filename = j, format = "GTiff", overwrite = TRUE)
-    
-    return(rst)
-  }
-  
-  rst_scl <- stack(lst_scl)
   
   ## deseasoning
   fls_scl <- list.files(dir_scl, pattern = "^SCL_MVC", full.names = TRUE)

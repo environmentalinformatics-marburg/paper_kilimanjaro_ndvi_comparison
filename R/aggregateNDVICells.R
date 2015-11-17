@@ -1,7 +1,7 @@
 aggregateNDVICells <- function(rst, 
                                rst_doy, 
                                dates, 
-                               n_cores = 1,
+                               cores = 1,
                                save_output = FALSE,
                                ...) {
   
@@ -9,7 +9,7 @@ aggregateNDVICells <- function(rst,
   lib <- c("raster", "zoo", "doParallel")
   jnk <- sapply(lib, function(x) library(x, character.only = TRUE))
 
-  registerDoParallel(cl <- makeCluster(n_cores))
+  registerDoParallel(cl <- makeCluster(cores))
   
   
   ### Data processing
@@ -21,7 +21,7 @@ aggregateNDVICells <- function(rst,
   mat <- as.matrix(rst)
   mat_doy <- as.matrix(rst_doy)
   
-  ls_agg <- foreach(h = 1:ncell(rst), .packages = "zoo", .combine = "rbind") %dopar% { 
+  ls_agg <- foreach(h = 1:ncell(rst), .packages = "zoo") %dopar% { 
     
     val <- mat[h, ]
     doy <- mat_doy[h, ]
@@ -55,6 +55,8 @@ aggregateNDVICells <- function(rst,
     
     return(val_agg[, 2])
   }
+  
+  ls_agg <- do.call("rbind", ls_agg)
   
   rst_agg <- foreach(h = 1:ncol(ls_agg), .combine = raster::stack) %do% {
     

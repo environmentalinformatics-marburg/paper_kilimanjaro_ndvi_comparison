@@ -94,15 +94,17 @@ qcMCD13 <- function(product, ref_ext,
     ndvi_mat_qa <- raster::as.matrix(ndvi.rst.qa)
     ndvi_rst_sd <- ndvi.rst.qa
     
-    ndvi_mat_sd <-  
+    ndvi_lst_sd <-  
       foreach(i = 1:nrow(ndvi_mat_qa), .packages = lib, 
-              .combine = "rbind", .export = ls(envir = globalenv())) %dopar% {
+              .export = ls(envir = globalenv())) %dopar% {
                 val <- ndvi_mat_qa[i, ]
                 id <- GSODTools::tsOutliers(val, lower_quantile = .4, 
                                             upper_quantile = .9, index = TRUE)
                 val[id] <- NA
                 return(matrix(val, ncol = length(val), byrow = TRUE))
               }
+    
+    ndvi_mat_sd <- do.call("rbind", ndvi_lst_sd)
     
     ndvi_rst_sd <- raster::setValues(ndvi_rst_sd, ndvi_mat_sd)
     
