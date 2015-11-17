@@ -25,7 +25,7 @@ ch_fls_dem <- paste0(ch_dir_extdata, "../dem/DEM_ARC1960_30m_Hemp.tif")
 rst_dem <- raster(ch_fls_dem)
 rst_dem <- aggregate(rst_dem, fact = 10)
 rst_dem <- projectRaster(rst_dem, crs = "+init=epsg:4326")
-p_dem <- visDEM(rst_dem, labcex = .6, cex = 1.6, col = "grey25")
+p_dem <- visDEM(rst_dem, labcex = .6, cex = 1.6, col = "black")
 
 ## reference extent
 fls_ndvi <- paste0(ch_dir_extdata, "MOD13Q1.006/whittaker_dsn/DSN_SCL_MVC_200301.tif")
@@ -51,11 +51,14 @@ rst_kili <- kiliAerial(upperLeft = c(num_ymax, num_xmin),
 
 # create figure
 p_bing <- spplot(rst_kili[[1]], col.regions = NA, colorkey = FALSE, 
-                 sp.layout = list(rgb2spLayout(rst_kili, quantiles = c(.01, .97)), 
+                 sp.layout = list(rgb2spLayout(rst_kili, quantiles = c(.005, .9775)), 
                                   list("sp.text", loc = c(37.04, -2.86), 
                                        txt = "a)", font = 2, cex = .6, 
-                                       adj = c(.1, 1), col = "black")),
-                 xlim = c(num_xmin, num_xmax), 
+                                       adj = c(.1, 1), col = "grey90"), 
+                                  list("sp.text", loc = c(37.6, -3.4), 
+                                       txt = "\uA9 OpenStreetMap contributors", 
+                                       font = 2, cex = .4, col = "grey90")),
+                 maxpixels = ncell(rst_kili), xlim = c(num_xmin, num_xmax), 
                  ylim = c(num_ymin, num_ymax), 
                  scales = list(draw = TRUE, cex = .5, 
                                y = list(at = seq(-2.9, -3.3, -.2))))
@@ -70,12 +73,6 @@ nd_year <- "2012"
 products <- list("GIMMS3g", 
                  "MOD13Q1.005", "MYD13Q1.005", 
                  "MOD13Q1.006", "MYD13Q1.006")
-
-labels <- list(expression(bold("b) NDVI"["3g"])), 
-               expression(bold("c) NDVI"["Terra-C5"])), 
-               expression(bold("d) NDVI"["Aqua-C5"])), 
-               expression(bold("e) NDVI"["Terra-C6"])), 
-               expression(bold("f) NDVI"["Aqua-C6"])))
 
 # ## breaks (works only when mann-kendall trend layers already exist)
 # fls_mk <- list.files(ch_dir_outdata, pattern = "mk_0312_tau05", 
@@ -133,11 +130,11 @@ lst_p_mk <- lapply(c(.05, .001), function(p_value) {
    
     # add contour lines and text 
     p <- p + 
-      latticeExtra::as.layer(p_dem) + 
       latticeExtra::layer(sp.polygons(spy_gimms, lty = 3, col = "grey75"), 
                           data = list(i = i)) + 
       latticeExtra::layer(sp.text(loc = c(37.04, -2.86), txt = txt, font = 2, 
-                                  cex = .6, adj = c(.1, 1)), data = list(txt = txt))
+                                  cex = .6, adj = c(.1, 1), col = "black"), 
+                          data = list(txt = txt)) 
     
     p <- envinmrRasterPlot(p, rot = 90, height = .5, width = .4, key.cex = .7)
     
@@ -153,6 +150,9 @@ lst_p_mk <- lapply(c(.05, .001), function(p_value) {
 ## combination final figure, p < 0.05
 p_mk_comb <- latticeCombineGrid(append(list(p_bing), lst_p_mk[[1]]), 
                                 layout = c(2, 3))
+
+p_mk_comb <- p_mk_comb + 
+  latticeExtra::as.layer(p_dem)
 
 ## density plot
 p_dens <- visDensity(p = .05, dsn = ch_dir_outdata, combined = FALSE)
@@ -265,6 +265,9 @@ dev.off()
 ################################################################################
 p_mk_comb <- latticeCombineGrid(lst_p_mk[[2]][2:5], 
                                 layout = c(2, 2))
+
+p_mk_comb <- p_mk_comb + 
+  latticeExtra::as.layer(p_dem)
 
 p_dens <- visDensity(p = 0.001, dsn = ch_dir_outdata, combined = FALSE)
 
