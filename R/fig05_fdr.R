@@ -108,6 +108,7 @@ lst_p_fdr <- lapply(c(.05, .001), function(p_value) {
 
 ## combine figures
 p_fdr <- latticeCombineGrid(lst_p_fdr, layout = c(2, 1))
+p_fdr <- update(p_fdr, scales = list(alternating = 1))
 
 ## in-text png version
 png(paste0(ch_dir_outdata, "figure05.png"), width = 15, height = 10, 

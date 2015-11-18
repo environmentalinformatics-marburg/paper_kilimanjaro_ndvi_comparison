@@ -1,8 +1,5 @@
 ### environmental stuff
 
-## functions (located in repository, not on external hdd)
-source("R/aggregateGimms.R")
-
 ## working directory
 # library(Orcs)
 # setwdOS(path_lin = "/media/fdetsch/XChange/", path_win = "D:/", 
