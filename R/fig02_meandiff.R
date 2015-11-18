@@ -41,7 +41,7 @@ invisible(
       
       foreach(j = 1:length(rst_mk), .combine = "rbind") %do% {
         
-        # if stacks are identical, ioa equals 1        
+        # if stacks are identical, mean difference equals 0
         if (i == j) {
           val_md <- 0
         } else {
