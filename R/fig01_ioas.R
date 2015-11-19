@@ -166,11 +166,18 @@ txt_ioa <- c(expression(bold("NDVI"['3g'])),
              expression(bold("NDVI"['Terra-C6'])), expression(bold("NDVI"['Aqua-C6'])))
 
 ## create figure
+
+# labels
+lbl <- seq(.86, .94, .02)
+for (i in seq(1, length(lbl)*2-2, 2))
+  lbl <- append(lbl, "", i)
+
 p_ioa <- 
   spplot(rst_ioa, col.regions = col_ioa, at = seq(.86, .94, .01), 
          scales = list(draw = TRUE, at = seq(.5, 4.5, 1), labels = txt_ioa, 
                        cex = .8, x = list(rot = 45)), 
-         colorkey = list(space = "top", labels = list(cex = .8), width = .7)) + 
+         colorkey = list(space = "top", labels = list(cex = .8, labels = lbl), 
+                         width = .7, at = seq(.86, .94, .01))) + 
   latticeExtra::layer(sp.polygons(rasterToPolygons(rst_ioa)))
 
 ## write to file
