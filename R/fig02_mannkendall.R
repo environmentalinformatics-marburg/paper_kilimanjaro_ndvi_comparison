@@ -5,7 +5,7 @@ rm(list = ls(all = TRUE))
 
 ## packages
 lib <- c("grid", "Rsenal", "foreach", "latticeExtra", "ggplot2", 
-         "Orcs", "stargazer")
+         "Orcs")
 Orcs::loadPkgs(lib)
 
 ## functions
@@ -158,7 +158,7 @@ p_mk_comb <- p_mk_comb +
 p_dens <- visDensity(p = .05, dsn = ch_dir_outdata, combined = FALSE)
 
 # in-text png version
-ch_fls_png <- paste0(ch_dir_outdata, "figure01.png")
+ch_fls_png <- paste0(ch_dir_outdata, "figure02.png")
 png(ch_fls_png, width = 20.5, height = 25, units = "cm", res = 500)
 plot.new()
 
@@ -209,7 +209,7 @@ grid.text(x = .05, y = .38, just = c("left", "bottom"), label = "Eq.",
 dev.off()
 
 # standalone tiff version
-ch_fls_tif <- paste0(ch_dir_outdata, "figure01.tiff")
+ch_fls_tif <- paste0(ch_dir_outdata, "figure02.tiff")
 tiff(ch_fls_tif, width = 20.5, height = 25, units = "cm", res = 500, 
      compression = "lzw")
 plot.new()
@@ -272,7 +272,7 @@ p_mk_comb <- p_mk_comb +
 p_dens <- visDensity(p = 0.001, dsn = ch_dir_outdata, combined = FALSE)
 
 # in-text png version
-ch_fls_png <- paste0(ch_dir_outdata, "figure03.png")
+ch_fls_png <- paste0(ch_dir_outdata, "figure04.png")
 png(ch_fls_png, width = 20.5, height = 18, units = "cm", res = 500)
 plot.new()
 
@@ -302,7 +302,7 @@ grid.rect(gp = gpar(col = "black", fill = "transparent", cex = 1.1))
 dev.off()
 
 # standalone tiff version
-ch_fls_tif <- paste0(ch_dir_outdata, "figure03.tiff")
+ch_fls_tif <- paste0(ch_dir_outdata, "figure04.tiff")
 tiff(ch_fls_tif, width = 20.5, height = 18, units = "cm", res = 500, 
      compression = "lzw")
 plot.new()

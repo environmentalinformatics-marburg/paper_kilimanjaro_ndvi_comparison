@@ -108,14 +108,14 @@ p_fdr <- latticeCombineGrid(lst_p_fdr, layout = c(2, 1))
 p_fdr <- update(p_fdr, scales = list(alternating = 1))
 
 ## in-text png version
-png(paste0(ch_dir_outdata, "figure05.png"), width = 15, height = 10, 
+png(paste0(ch_dir_outdata, "figure06.png"), width = 15, height = 10, 
     units = "cm", res = 500)
 plot.new()    
 print(p_fdr, newpage = FALSE)
 dev.off()
 
 ## stand-alone tiff version
-tiff(paste0(ch_dir_outdata, "figure05.tiff"), width = 15, height = 10, 
+tiff(paste0(ch_dir_outdata, "figure06.tiff"), width = 15, height = 10, 
      units = "cm", res = 500, compression = "lzw")
 plot.new()    
 print(p_fdr, newpage = FALSE)

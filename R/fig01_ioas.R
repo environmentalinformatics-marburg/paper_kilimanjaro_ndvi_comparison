@@ -4,7 +4,8 @@
 rm(list = ls(all = TRUE))
 
 ## packages
-lib <- c("doParallel", "Rsenal", "rgdal", "stargazer", "RColorBrewer", "grid")
+lib <- c("doParallel", "Rsenal", "rgdal", "stargazer", "RColorBrewer", "grid", 
+         "lattice")
 Orcs::loadPkgs(lib)
 
 ## functions
@@ -79,55 +80,55 @@ gimms_inside <- readRDS("data/gimms_inside_np.rds")
 modis_inside <- readRDS("data/modis_inside_np.rds")
 
 ## calculate ioa
-dat_ioa <- foreach(i = 1:length(ls_rst_ndvi), .combine = "rbind") %do% {
-  
-  # status message
-  cat("Processing list entry no. ", i, "...\n", sep = "")
-  
-  foreach(j = 1:length(ls_rst_ndvi), .combine = "rbind", 
-          .packages = c("raster", "Rsenal")) %dopar% {
-    
-    # if stacks are identical, ioa equals 1        
-    if (i == j) {
-      val_ioa <- 1
-    } else {
-      
-      rst1 <- ls_rst_ndvi[[i]]
-      
-      # reject cells located inside kilimanjaro national park
-      rst1[if (i == 1) gimms_inside else modis_inside] <- NA
-
-      # resample modis
-      if (i == 1 & j != 1) {
-        rst2 <- resample(ls_rst_ndvi[[j]], rst1)
-        rst2[gimms_inside] <- NA
-      } else if (i > 1 & j > 1) {
-        rst2 <- ls_rst_ndvi[[j]]
-        rst2[modis_inside] <- NA
-
-      } else if (i != 1 & j == 1) {
-        rst2 <- ls_rst_ndvi[[j]]
-        rst2[gimms_inside] <- NA
-        
-        rst1 <- resample(rst1, rst2)
-        rst1[gimms_inside] <- NA
-      }
-      
-      # extract values
-      val1 <- rst1[]
-      val2 <- rst2[]
-      
-      # calculate ioa
-      val_ioa <- mean(sapply(1:nrow(val1), function(k) {
-        Rsenal:::ioaC(val1[k, ], val2[k, ])
-      }), na.rm = TRUE)
-    }
-            
-    data.frame(ref1 = products[i], ref2 = products[j], ioa = val_ioa)  
-  }
-}
-
-save(dat_ioa, file = "data/ioa.RData")
+# dat_ioa <- foreach(i = 1:length(ls_rst_ndvi), .combine = "rbind") %do% {
+#   
+#   # status message
+#   cat("Processing list entry no. ", i, "...\n", sep = "")
+#   
+#   foreach(j = 1:length(ls_rst_ndvi), .combine = "rbind", 
+#           .packages = c("raster", "Rsenal")) %dopar% {
+#     
+#     # if stacks are identical, ioa equals 1        
+#     if (i == j) {
+#       val_ioa <- 1
+#     } else {
+#       
+#       rst1 <- ls_rst_ndvi[[i]]
+#       
+#       # reject cells located inside kilimanjaro national park
+#       rst1[if (i == 1) gimms_inside else modis_inside] <- NA
+# 
+#       # resample modis
+#       if (i == 1 & j != 1) {
+#         rst2 <- resample(ls_rst_ndvi[[j]], rst1)
+#         rst2[gimms_inside] <- NA
+#       } else if (i > 1 & j > 1) {
+#         rst2 <- ls_rst_ndvi[[j]]
+#         rst2[modis_inside] <- NA
+# 
+#       } else if (i != 1 & j == 1) {
+#         rst2 <- ls_rst_ndvi[[j]]
+#         rst2[gimms_inside] <- NA
+#         
+#         rst1 <- resample(rst1, rst2)
+#         rst1[gimms_inside] <- NA
+#       }
+#       
+#       # extract values
+#       val1 <- rst1[]
+#       val2 <- rst2[]
+#       
+#       # calculate ioa
+#       val_ioa <- mean(sapply(1:nrow(val1), function(k) {
+#         Rsenal:::ioaC(val1[k, ], val2[k, ])
+#       }), na.rm = TRUE)
+#     }
+#             
+#     data.frame(ref1 = products[i], ref2 = products[j], ioa = val_ioa)  
+#   }
+# }
+# 
+# save(dat_ioa, file = "data/ioa.RData")
 load("data/ioa.RData")
 
 ## reformat table
@@ -173,7 +174,7 @@ p_ioa <-
   latticeExtra::layer(sp.polygons(rasterToPolygons(rst_ioa)))
 
 ## write to file
-png(paste0(ch_dir_outdata, "figure00.png"), width = 10.5, height = 12, 
+png(paste0(ch_dir_outdata, "figure01.png"), width = 10.5, height = 12, 
     units = "cm", res = 500)
 # main figure
 grid.newpage()
@@ -184,11 +185,11 @@ print(p_ioa, newpage = FALSE)
 
 # key caption
 downViewport(trellis.vpname("figure"))
-grid.text(expression(bold("IOAs")), x = 0.5, y = 1.3, 
+grid.text(expression(bold("IOA"["s"])), x = 0.5, y = 1.3, 
           just = c("centre", "bottom"), gp = gpar(font = 2, cex = .9))
 dev.off()
 
-tiff(paste0(ch_dir_outdata, "figure00.tiff"), width = 10.5, height = 12, 
+tiff(paste0(ch_dir_outdata, "figure01.tiff"), width = 10.5, height = 12, 
      units = "cm", res = 500, compression = "lzw")
 # main figure
 grid.newpage()
@@ -199,7 +200,7 @@ print(p_ioa, newpage = FALSE)
 
 # key caption
 downViewport(trellis.vpname("figure"))
-grid.text(expression(bold("IOAs")), x = 0.5, y = 1.3, 
+grid.text(expression(bold("IOA"["s"])), x = 0.5, y = 1.3, 
           just = c("centre", "bottom"), gp = gpar(font = 2, cex = .9))
 dev.off()
 

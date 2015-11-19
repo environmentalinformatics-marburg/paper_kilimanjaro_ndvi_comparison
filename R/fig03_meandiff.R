@@ -114,7 +114,7 @@ invisible(
                           data = list(rst_md = rst_md))
     
     # in-text .png version
-    file_out <- paste0(ch_dir_outdata, "figure0", ifelse(p_value == .05, "2", "4"))
+    file_out <- paste0(ch_dir_outdata, "figure0", ifelse(p_value == .05, "3", "5"))
     png(paste0(file_out, ".png"), width = 10.5, height = 12, 
         units = "cm", res = 500)
     # main figure
