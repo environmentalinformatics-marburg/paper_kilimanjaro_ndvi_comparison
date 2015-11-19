@@ -23,9 +23,6 @@ invisible(
                   "MOD13Q1.005", "MYD13Q1.005", 
                   "MOD13Q1.006", "MYD13Q1.006")
     
-    if (p_value == .001)
-      products <- products[-1]
-    
     # import mann-kendall layers (p < 0.05)
     pattern <- paste0("0312_tau", substr(p_value, 3, nchar(p_value)), ".tif$")
     
@@ -33,13 +30,12 @@ invisible(
                          full.names = TRUE)[c(1, 2, 4, 3, 5)]
     rst_mk <- lapply(fls_mk, raster)
     
-    if (p_value == .001)
-      rst_mk <- rst_mk[-1]
-    
     # loop over layers  
-    dat_md <- foreach(i = 1:length(rst_mk), .combine = "rbind") %do% {
+    dat_md <- foreach(i = 2:length(rst_mk), 
+                      .combine = "rbind") %do% {
       
-      foreach(j = 1:length(rst_mk), .combine = "rbind") %do% {
+      foreach(j = 2:length(rst_mk), 
+              .combine = "rbind") %do% {
         
         # if stacks are identical, mean difference equals 0
         if (i == j) {
@@ -50,12 +46,23 @@ invisible(
           
           # resample modis
           if (i == 1 & j != 1) {
-            rst2 <- resample(rst_mk[[j]], rst1)
+            rst2 <- rst1
+            rst2[] <- NA
+            
+            spy1 <- rasterToPolygons(rst1)
+            rst2[which(!is.na(rst1[]))] <- extract(rst_mk[[j]], spy1, 
+                                                   fun = mean, na.rm = TRUE)
           } else {
             rst2 <- rst_mk[[j]]
             
-            if (i != 1 & j == 1) 
-              rst1 <- resample(rst1, rst2)
+            if (i != 1 & j == 1) {
+              rst1 <- rst2
+              rst1[] <- NA
+              
+              spy2 <- rasterToPolygons(rst2)
+              rst1[which(!is.na(rst2[]))] <- extract(rst_mk[[i]], spy2, 
+                                                     fun = mean, na.rm = TRUE)
+            }
           }
           
           # extract values
@@ -74,6 +81,9 @@ invisible(
     # write results to file
     file_out <- paste0("data/md_tau", substr(p_value, 3, nchar(p_value)), ".RData")
     save(dat_md, file = file_out)
+
+    # remove gimms from 'products'
+    products <- products[-1]
     
     # insert values into raster template
     mat_md <- matrix(ncol = length(products), nrow = length(products))
@@ -86,25 +96,25 @@ invisible(
     rst_md <- raster(mat_md, xmn = 0, xmx = length(products), 
                      ymn = 0, ymx = length(products))
     
-    # labels
-    if (p_value == 0.05) {
-      lbl <- c(expression(bold("NDVI"["3g"])), 
-               expression(bold("NDVI"["Terra-C5"])), 
+    ## labels
+    #     if (p_value == 0.05) {
+    #       lbl <- c(expression(bold("NDVI"["3g"])), 
+    #                expression(bold("NDVI"["Terra-C5"])), 
+    #                expression(bold("NDVI"["Aqua-C5"])), 
+    #                expression(bold("NDVI"["Terra-C6"])), 
+    #                expression(bold("NDVI"["Aqua-C6"])))
+    #     } else {
+    lbl <- c(expression(bold("NDVI"["Terra-C5"])), 
                expression(bold("NDVI"["Aqua-C5"])), 
                expression(bold("NDVI"["Terra-C6"])), 
                expression(bold("NDVI"["Aqua-C6"])))
-    } else {
-      lbl <- c(expression(bold("NDVI"["Terra-C5"])), 
-               expression(bold("NDVI"["Aqua-C5"])), 
-               expression(bold("NDVI"["Terra-C6"])), 
-               expression(bold("NDVI"["Aqua-C6"])))
-    }
+    # }
     
     # colors
     cols <- colorRampPalette(brewer.pal(11, "RdBu"))
     
     # create figure
-    p_md <- spplot(rst_md, col.regions = cols(100), at = seq(-.09, .09, .015), 
+    p_md <- spplot(rst_md, col.regions = cols(100), at = seq(-.05, .05, .01), 
                    scales = list(draw = TRUE, at = seq(.5, xmax(rst_md)-.5, 1), 
                                  cex = .8, x = list(rot = 45), labels = lbl), 
                    colorkey = list(space = "top", width = .7,
