@@ -18,9 +18,6 @@ ch_dir_outdata <- "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/out/"
 ################################################################################
 ### data processing
 
-## colors
-cols <- colorRampPalette(rev(brewer.pal(5, "PuOr")))
-
 ## loop over significance levels
 lst_p_fdr <- lapply(c(.05, .001), function(p_value) {
   
@@ -63,9 +60,9 @@ lst_p_fdr <- lapply(c(.05, .001), function(p_value) {
   
   # create levelplot
   p_heatmap <- 
-    levelplot(rst_fdr, margin = FALSE, col.regions = cols(100),
+    levelplot(rst_fdr, margin = FALSE, col.regions = envinmrPalette(501),
               colorkey = list(space = "top", width = .6, height = .5), 
-              main = list("FDR", hjust = -.5, cex = .9), at = seq(0, 1, .01),
+              main = list("FDR", hjust = -.5, cex = .9), at = seq(0, 1, .002),
               xlab = list("Power", cex = .8, vjust = -.5), 
               ylab = list("Prevalence", cex = .8),
               scales = list(cex = .7))
