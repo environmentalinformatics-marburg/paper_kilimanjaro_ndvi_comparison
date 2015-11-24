@@ -10,6 +10,7 @@ Orcs::loadPkgs(lib)
 
 ## functions
 source("R/insideNP.R")
+source("R/visDEM.R")
 
 ## parallelization
 cl <- makeCluster(3)
@@ -216,6 +217,49 @@ dev.off()
 ### gimms grid
 ################################################################################
 
+## digital elevation model (dem)
+ch_fls_dem <- paste0(ch_dir_extdata, "../dem/DEM_ARC1960_30m_Hemp.tif")
+rst_dem <- raster(ch_fls_dem)
+rst_dem <- aggregate(rst_dem, fact = 10)
+rst_dem <- projectRaster(rst_dem, crs = "+init=epsg:4326")
+p_dem <- visDEM(rst_dem, labcex = .6, cex = 1.6, col = "black")
+
+## reference extent
+fls_ndvi <- paste0(ch_dir_extdata, "MOD13Q1.006/whittaker_dsn/DSN_SCL_MVC_200301.tif")
+
+rst_ndvi <- raster(fls_ndvi[1])
+rst_ndvi <- projectRaster(rst_ndvi, crs = "+init=epsg:4326")
+rst_ndvi <- trim(rst_ndvi)
+
+num_xmin <- xmin(rst_ndvi)
+num_xmax <- xmax(rst_ndvi)
+num_ymin <- ymin(rst_ndvi)
+num_ymax <- ymax(rst_ndvi)
+
+## gimms grid
+rst_gimms <- raster(paste0(ch_dir_outdata, "/GIMMS3g_mk_0312_tau.tif"))
+rst_gimms <- projectRaster(rst_gimms, crs = "+init=epsg:4326")
+spy_gimms <- rasterToPolygons(rst_gimms)
+
+## study area
+rst_kili <- kiliAerial(upperLeft = c(num_ymax, num_xmin), 
+                       lowerRight = c(num_ymin, num_xmax),
+                       minNumTiles = 12L, projection = "+init=epsg:4326")
+
+# create figure
+p_bing <- spplot(rst_kili[[1]], col.regions = NA, colorkey = FALSE, 
+                 sp.layout = list(rgb2spLayout(rst_kili, quantiles = c(.005, .9775)), 
+                                  list("sp.text", loc = c(37.02, -2.86), 
+                                       txt = "a)", font = 2, cex = .6, 
+                                       adj = c(.1, 1), col = "black"), 
+                                  list("sp.text", loc = c(37.6, -3.4), 
+                                       txt = "\uA9 OpenStreetMap contributors", 
+                                       font = 2, cex = .4, col = "grey90")),
+                 maxpixels = ncell(rst_kili), xlim = c(num_xmin, num_xmax), 
+                 ylim = c(num_ymin, num_ymax), 
+                 scales = list(draw = TRUE, cex = .5, 
+                               y = list(at = seq(-2.9, -3.3, -.2))))
+
 ## gimms stack
 rst1 <- ls_rst_ndvi[[1]]
 rst1[gimms_inside] <- NA
@@ -259,17 +303,17 @@ rst_kili_grey <- rst_kili[[1]]
 rst_kili_grey[] <- greys
 
 ## create figure
-p_ioa_gimms <- spplot(rst_ioa_gimms, col.regions = col_ioa(100), 
+p_ioa_gimms <- spplot(rst_ioa_gimms, col.regions = envinmrPalette(500), 
                       xlim = c(num_xmin, num_xmax), 
                       ylim = c(num_ymin, num_ymax), 
-                      at = seq(0.80, 1, .005), 
+                      at = seq(.40, .95, .005), 
                       colorkey = list(space = "top", labels = list(cex = .8), width = .7),
                       scales = list(draw = TRUE), alpha.regions = 1) + 
   p_dem + 
   latticeExtra::layer(sp.polygons(rasterToPolygons(rst_ioa_gimms), 
                                   lwd = 1, lty = 3, col = "white")) + 
-  latticeExtra::layer(sp.text("b)", loc = c(37.04, -2.86), font = 2, cex = .6, 
-                              adj = c(.1, 1), col = "grey90"))
+  latticeExtra::layer(sp.text("b)", loc = c(37.02, -2.86), font = 2, cex = .6, 
+                              adj = c(.1, 1), col = "black"))
 
 
 p_bing <- p_bing + 
@@ -279,7 +323,7 @@ p_bing <- p_bing +
 p_ioa_comb <- latticeCombineGrid(list(p_bing, p_ioa_gimms))
 
 ## write to file
-png(paste0(ch_dir_outdata, "figure0x.png"), width = 20, height = 14, 
+png(paste0(ch_dir_outdata, "figure0x.png"), width = 20, height = 10, 
     units = "cm", res = 500)
 plot.new()
 vp0 <- viewport(x = 0, y = 0, width = .9, height = 1, 
@@ -291,15 +335,16 @@ upViewport()
 vp1 <- viewport(x = .865, y = 0, width = .1, height = 1, 
                 just = c("left", "bottom"), name = "vp_key")
 pushViewport(vp1)
-draw.colorkey(key = list(col = col_ioa(100), 
+draw.colorkey(key = list(col = envinmrPalette(500), 
                          width = .6, height = .425,
-                         at = seq(.8, 1, .005), 
+                         at = seq(.4, .95, .005), 
                          space = "right"), draw = TRUE)
 
-grid.text("IOAs", x = 1.05, y = .5, rot = -90, gp = gpar(font = 2, cex = .85))
+grid.text(expression("IOA"["s"]), x = 1.05, y = .5, rot = -90, 
+          gp = gpar(font = 2, cex = .85))
 dev.off()
 
-tiff(paste0(ch_dir_outdata, "figure0x.tiff"), width = 20, height = 14, 
+tiff(paste0(ch_dir_outdata, "figure0x.tiff"), width = 20, height = 10, 
      units = "cm", res = 500, compression = "lzw")
 plot.new()
 vp0 <- viewport(x = 0, y = 0, width = .9, height = 1, 
@@ -311,12 +356,13 @@ upViewport()
 vp1 <- viewport(x = .865, y = 0, width = .1, height = 1, 
                 just = c("left", "bottom"), name = "vp_key")
 pushViewport(vp1)
-draw.colorkey(key = list(col = col_ioa(100), 
+draw.colorkey(key = list(col = envinmrPalette(500), 
                          width = .6, height = .425,
-                         at = seq(.35, 1, .01), 
+                         at = seq(.4, .95, .005), 
                          space = "right"), draw = TRUE)
 
-grid.text("IOAs", x = 1.05, y = .5, rot = -90, gp = gpar(font = 2, cex = .85))
+grid.text(expression("IOA"["s"]), x = 1.05, y = .5, rot = -90, 
+          gp = gpar(font = 2, cex = .85))
 dev.off()
 
 ## close parallel backend
