@@ -64,7 +64,7 @@ lst_p_fdr <- lapply(c(.05, .001), function(p_value) {
               colorkey = list(space = "top", width = .6, height = .5), 
               main = list("FDR", hjust = -.5, cex = .9), at = seq(0, 1, .002),
               xlab = list("Power", cex = .8, vjust = -.5), 
-              ylab = list("Prevalence", cex = .8),
+              ylab = list("P", cex = .8),
               scales = list(cex = .7))
   
   # create contourplot
