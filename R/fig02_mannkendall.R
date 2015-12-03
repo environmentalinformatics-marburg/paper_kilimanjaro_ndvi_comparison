@@ -15,8 +15,8 @@ source("R/visMannKendall.R")
 source("R/visDensity.R")
 
 ## folders
-ch_dir_extdata <- "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/data/rst/"
-ch_dir_outdata <- "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/out/"
+ch_dir_extdata <- "/media/dogbert/XChange/kilimanjaro/ndvi_comparison/data/rst/"
+ch_dir_outdata <- "/media/dogbert/XChange/kilimanjaro/ndvi_comparison/out/"
 
 ### data processing
 
@@ -50,6 +50,14 @@ rst_kili <- kiliAerial(upperLeft = c(num_ymax, num_xmin),
                        minNumTiles = 12L, projection = "+init=epsg:4326")
 
 # create figure
+scale <- list("SpatialPolygonsRescale", layout.scale.bar(), scale = 0.1001712, 
+              offset = c(37.05, -3.38), fill = c("transparent", "black"))
+text1 = list("sp.text", c(37.05, -3.36), "0", cex = .5)
+text2 = list("sp.text", c(37.16, -3.36), "10 km", cex = .5)
+
+arrow <- list("SpatialPolygonsRescale", layout.north.arrow(type = 1), 
+              offset = c(37, -3.41), scale = .075)
+
 p_bing <- spplot(rst_kili[[1]], col.regions = NA, colorkey = FALSE, 
                  sp.layout = list(rgb2spLayout(rst_kili, quantiles = c(.005, .9775)), 
                                   list("sp.text", loc = c(37.04, -2.86), 
@@ -57,7 +65,8 @@ p_bing <- spplot(rst_kili[[1]], col.regions = NA, colorkey = FALSE,
                                        adj = c(.1, 1), col = "grey90"), 
                                   list("sp.text", loc = c(37.6, -3.4), 
                                        txt = "\uA9 OpenStreetMap contributors", 
-                                       font = 2, cex = .4, col = "grey90")),
+                                       font = 2, cex = .4, col = "grey90"), 
+                                  scale, text1, text2, arrow),
                  maxpixels = ncell(rst_kili), xlim = c(num_xmin, num_xmax), 
                  ylim = c(num_ymin, num_ymax), 
                  scales = list(draw = TRUE, cex = .5, 
