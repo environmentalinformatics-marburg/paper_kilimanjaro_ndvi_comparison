@@ -17,9 +17,9 @@ supcl <- makeCluster(3)
 registerDoParallel(supcl)
 
 ## folders
-ch_dir_data <- "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/data/"
-ch_dir_extdata <- "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/data/rst/"
-ch_dir_outdata <- "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/out/"
+ch_dir_data <- "/media/dogbert/XChange/kilimanjaro/ndvi_comparison/data/"
+ch_dir_extdata <- "/media/dogbert/XChange/kilimanjaro/ndvi_comparison/data/rst/"
+ch_dir_outdata <- "/media/dogbert/XChange/kilimanjaro/ndvi_comparison/out/"
 
 
 ### data processing
@@ -95,7 +95,7 @@ gimms_summit <- readRDS("data/gimms_near_summit.rds")
 # saveRDS(modis_summit, file = "data/modis_near_summit.rds")
 modis_summit <- readRDS("data/modis_near_summit.rds")
 
-# calculate ioa
+# # calculate ioa
 # dat_ioa <- foreach(i = 1:length(ls_rst_ndvi), .combine = "rbind") %do% {
 #   
 #   # status message
@@ -163,70 +163,70 @@ colnames(out) <- products
 # latex output
 stargazer(out, summary = FALSE)
 
-################################################################################
-## figure (similar to fig. 2 on mean difference)
-################################################################################
-
-## raster template
-products[1] <- "GIMMS3g"
-mat_ioa <- matrix(ncol = length(products), nrow = length(products))
-for (i in 1:length(products)) {
-  sub <- subset(dat_ioa, ref1 == rev(products)[i])
-  mat_ioa[i, ] <- sub$ioa
-}
-mat_ioa[mat_ioa == 1] <- NA
-rst_ioa <- raster(mat_ioa, xmn = 0, xmx = 5, ymn = 0, ymx = 5)
-
-col_ioa <- colorRampPalette(brewer.pal(7, "YlOrRd"))
-txt_ioa <- c(expression(bold("NDVI"['3g'])), 
-             expression(bold("NDVI"['Terra-C5'])), expression(bold("NDVI"['Aqua-C5'])), 
-             expression(bold("NDVI"['Terra-C6'])), expression(bold("NDVI"['Aqua-C6'])))
-
-## create figure
-
-# labels
-lbl <- seq(.86, .94, .02)
-for (i in seq(1, length(lbl)*2-2, 2))
-  lbl <- append(lbl, "", i)
-
-p_ioa <- 
-  spplot(rst_ioa, col.regions = col_ioa, at = seq(.75, .87, .01), 
-         scales = list(draw = TRUE, at = seq(.5, 4.5, 1), labels = txt_ioa, 
-                       cex = .8, x = list(rot = 45)), 
-         colorkey = list(space = "top", labels = list(cex = .8, labels = lbl), 
-                         width = .7, at = seq(.75, .87, .01))) + 
-  latticeExtra::layer(sp.polygons(rasterToPolygons(rst_ioa)))
-
-## write to file
-png(paste0(ch_dir_outdata, "figure00.png"), width = 10.5, height = 12, 
-    units = "cm", res = 500)
-# main figure
-grid.newpage()
-vp0 <- viewport(x = 0, y = 0, width = 1, height = .9, 
-                just = c("left", "bottom"), name = "vp_figure")
-pushViewport(vp0)
-print(p_ioa, newpage = FALSE)
-
-# key caption
-downViewport(trellis.vpname("figure"))
-grid.text(expression(bold("IOA"["s"])), x = 0.5, y = 1.3, 
-          just = c("centre", "bottom"), gp = gpar(font = 2, cex = .9))
-dev.off()
-
-tiff(paste0(ch_dir_outdata, "figure00.tiff"), width = 10.5, height = 12, 
-     units = "cm", res = 500, compression = "lzw")
-# main figure
-grid.newpage()
-vp0 <- viewport(x = 0, y = 0, width = 1, height = .9, 
-                just = c("left", "bottom"), name = "vp_figure")
-pushViewport(vp0)
-print(p_ioa, newpage = FALSE)
-
-# key caption
-downViewport(trellis.vpname("figure"))
-grid.text(expression(bold("IOA"["s"])), x = 0.5, y = 1.3, 
-          just = c("centre", "bottom"), gp = gpar(font = 2, cex = .9))
-dev.off()
+# ################################################################################
+# ## figure (similar to fig. 2 on mean difference)
+# ################################################################################
+# 
+# ## raster template
+# products[1] <- "GIMMS3g"
+# mat_ioa <- matrix(ncol = length(products), nrow = length(products))
+# for (i in 1:length(products)) {
+#   sub <- subset(dat_ioa, ref1 == rev(products)[i])
+#   mat_ioa[i, ] <- sub$ioa
+# }
+# mat_ioa[mat_ioa == 1] <- NA
+# rst_ioa <- raster(mat_ioa, xmn = 0, xmx = 5, ymn = 0, ymx = 5)
+# 
+# col_ioa <- colorRampPalette(brewer.pal(7, "YlOrRd"))
+# txt_ioa <- c(expression(bold("NDVI"['3g'])), 
+#              expression(bold("NDVI"['Terra-C5'])), expression(bold("NDVI"['Aqua-C5'])), 
+#              expression(bold("NDVI"['Terra-C6'])), expression(bold("NDVI"['Aqua-C6'])))
+# 
+# ## create figure
+# 
+# # labels
+# lbl <- seq(.86, .94, .02)
+# for (i in seq(1, length(lbl)*2-2, 2))
+#   lbl <- append(lbl, "", i)
+# 
+# p_ioa <- 
+#   spplot(rst_ioa, col.regions = col_ioa, at = seq(.75, .87, .01), 
+#          scales = list(draw = TRUE, at = seq(.5, 4.5, 1), labels = txt_ioa, 
+#                        cex = .8, x = list(rot = 45)), 
+#          colorkey = list(space = "top", labels = list(cex = .8, labels = lbl), 
+#                          width = .7, at = seq(.75, .87, .01))) + 
+#   latticeExtra::layer(sp.polygons(rasterToPolygons(rst_ioa)))
+# 
+# ## write to file
+# png(paste0(ch_dir_outdata, "figure00.png"), width = 10.5, height = 12, 
+#     units = "cm", res = 500)
+# # main figure
+# grid.newpage()
+# vp0 <- viewport(x = 0, y = 0, width = 1, height = .9, 
+#                 just = c("left", "bottom"), name = "vp_figure")
+# pushViewport(vp0)
+# print(p_ioa, newpage = FALSE)
+# 
+# # key caption
+# downViewport(trellis.vpname("figure"))
+# grid.text(expression(bold("IOA"["s"])), x = 0.5, y = 1.3, 
+#           just = c("centre", "bottom"), gp = gpar(font = 2, cex = .9))
+# dev.off()
+# 
+# tiff(paste0(ch_dir_outdata, "figure00.tiff"), width = 10.5, height = 12, 
+#      units = "cm", res = 500, compression = "lzw")
+# # main figure
+# grid.newpage()
+# vp0 <- viewport(x = 0, y = 0, width = 1, height = .9, 
+#                 just = c("left", "bottom"), name = "vp_figure")
+# pushViewport(vp0)
+# print(p_ioa, newpage = FALSE)
+# 
+# # key caption
+# downViewport(trellis.vpname("figure"))
+# grid.text(expression(bold("IOA"["s"])), x = 0.5, y = 1.3, 
+#           just = c("centre", "bottom"), gp = gpar(font = 2, cex = .9))
+# dev.off()
 
 
 ################################################################################
@@ -276,11 +276,20 @@ rst_kili <- kiliAerial(upperLeft = c(num_ymax, num_xmin),
 #                                y = list(at = seq(-2.9, -3.3, -.2))))
 
 # create figure (google)
+scale <- list("SpatialPolygonsRescale", layout.scale.bar(), scale = 0.1001712, 
+              offset = c(37.05, -3.38), fill = c("transparent", "black"))
+text1 = list("sp.text", c(37.05, -3.36), "0", cex = .5)
+text2 = list("sp.text", c(37.16, -3.36), "10 km", cex = .5)
+
+arrow <- list("SpatialPolygonsRescale", layout.north.arrow(type = 1), 
+             offset = c(37, -3.41), scale = .075)
+
 p_bing <- spplot(rst_kili[[1]], col.regions = NA, colorkey = FALSE, 
                  sp.layout = list(rgb2spLayout(rst_kili, quantiles = c(0, .999)), 
                                   list("sp.text", loc = c(37.02, -2.86), 
                                        txt = "a)", font = 2, cex = .6, 
-                                       adj = c(.1, 1), col = "black")), 
+                                       adj = c(.1, 1), col = "black"), 
+                                  scale, arrow, text1, text2), 
 #                                   list("sp.text", loc = c(37.65, -3.425), 
 #                                        txt = "\uA9 Google Maps", 
 #                                        font = 2, cex = .4, col = "black")),
@@ -290,29 +299,9 @@ p_bing <- spplot(rst_kili[[1]], col.regions = NA, colorkey = FALSE,
                                y = list(at = seq(-2.9, -3.3, -.2))))
 
 ## insert values
-val_ioa_gimms <- apply(dat_ioa, 1, mean)
-rst_ioa_gimms <- rst1[[1]]
-rst_ioa_gimms[] <- val_ioa_gimms
-rst_ioa_gimms <- projectRaster(rst_ioa_gimms, crs = "+init=epsg:4326", 
-                               method = "ngb")
-rst_ioa_gimms <- trim(rst_ioa_gimms)
-
-spg_ioa_gimms <- as(rst_ioa_gimms, "SpatialGridDataFrame")
-spg_ioa_gimms@data <- data.frame("ID" = formatC(1:63, width = 2, flag = "0"))
-p_lbl <- spplot(spg_ioa_gimms, "ID", colorkey = FALSE, col.regions = "transparent",
-                panel = function(...) {
-                  panel.gridplot(..., border = "transparent")
-                  panel.text(..., labels = spg_ioa_gimms@data$ID, 
-                             col = "white", font = 2, adj = c(-.7, 2.4), 
-                             cex = .5)
-                })
-
-p_bing <- p_bing + 
-  latticeExtra::as.layer(p_lbl)
-
 ## gimms stack
 rst1 <- ls_rst_ndvi[[1]]
-# rst1[gimms_inside] <- NA
+rst1[gimms_summit] <- NA
 val1 <- rst1[]
 
 ## loop over modis stacks
@@ -337,11 +326,32 @@ dat_ioa <- foreach(j = 2:length(ls_rst_ndvi), .combine = "cbind",
                      matrix(val_ioa, ncol = 1)
                    }
 
+# val_ioa_gimms <- apply(dat_ioa, 1, mean)
+val_ioa_gimms <- dat_ioa[, 2] # aqua-modis, collection5 -> best agreement
+rst_ioa_gimms <- rst1[[1]]
+rst_ioa_gimms[] <- val_ioa_gimms
+rst_ioa_gimms <- projectRaster(rst_ioa_gimms, crs = "+init=epsg:4326", 
+                               method = "ngb")
+rst_ioa_gimms <- trim(rst_ioa_gimms)
+
+spg_ioa_gimms <- as(rst_ioa_gimms, "SpatialGridDataFrame")
+spg_ioa_gimms@data <- data.frame("ID" = formatC(1:63, width = 2, flag = "0"))
+p_lbl <- spplot(spg_ioa_gimms, "ID", colorkey = FALSE, col.regions = "transparent",
+                panel = function(...) {
+                  panel.gridplot(..., border = "transparent")
+                  panel.text(..., labels = spg_ioa_gimms@data$ID, 
+                             col = "white", font = 2, adj = c(-.7, 2.4), 
+                             cex = .5)
+                })
+
+p_bing <- p_bing + 
+  latticeExtra::as.layer(p_lbl)
+
 ## create figure
 p_ioa_gimms <- spplot(rst_ioa_gimms, col.regions = envinmrPalette(500), 
                       xlim = c(num_xmin, num_xmax), 
                       ylim = c(num_ymin, num_ymax), 
-                      at = seq(.35, .95, .005), 
+                      at = seq(.375, .975, .005), 
                       colorkey = list(space = "top", labels = list(cex = .8), width = .7),
                       scales = list(draw = TRUE), alpha.regions = 1) + 
   latticeExtra::layer(sp.text("b)", loc = c(37.02, -2.86), font = 2, cex = .6, 
@@ -355,7 +365,7 @@ p_ioa_comb <- p_ioa_comb +
                                   lwd = 1, lty = 3, col = "white")) + 
   latticeExtra::as.layer(p_dem)
 
-source("R/fig02_homogeneities.R")
+source("R/fig01_homogeneities.R")
 g_cellts <- ggplotGrob(p_cellts)
 for (i in seq(3, 27, 4))
   g_cellts$heights[[i]] = unit(.1,"in")
