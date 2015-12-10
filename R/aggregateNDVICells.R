@@ -6,12 +6,10 @@ aggregateNDVICells <- function(rst,
                                ...) {
   
   ### Environmental settings
-  lib <- c("raster", "zoo", "doParallel")
+  lib <- c("raster", "zoo", "foreach", "dplyr")
   jnk <- sapply(lib, function(x) library(x, character.only = TRUE))
 
-  registerDoParallel(cl <- makeCluster(cores))
-  
-  
+
   ### Data processing
   months <- unique(as.yearmon(as.character(dates), format = "%Y%j"))
   months_len <- length(months)
@@ -21,8 +19,12 @@ aggregateNDVICells <- function(rst,
   mat <- as.matrix(rst)
   mat_doy <- as.matrix(rst_doy)
   
-  ls_agg <- foreach(h = 1:ncell(rst), .packages = "zoo") %dopar% { 
+  ls_agg <- foreach(h = 1:nrow(mat)) %do% { 
     
+    # status message
+    if ((h %% 1000) == 0)
+      cat("Currently processing cell", h, "...\n")
+      
     val <- mat[h, ]
     doy <- mat_doy[h, ]
     
@@ -46,8 +48,12 @@ aggregateNDVICells <- function(rst,
       return(new_doy)
     })
     
-    val_agg <- aggregate(val, by = list(as.yearmon(df[, 1], format = "%Y%j")), 
-                         FUN = function(...) max(..., na.rm = TRUE))
+    df %>%
+      dplyr::mutate(Month = as.yearmon(dates, format = "%Y%j")) %>%
+      dplyr::group_by(Month) %>%
+      dplyr::summarise(max(val, na.rm = TRUE)) %>%
+      data.frame() -> val_agg
+    
     names(val_agg) <- c("Month", as.character(h))
     
     if (!identical(months, val_agg[, 1]))
@@ -58,21 +64,15 @@ aggregateNDVICells <- function(rst,
   
   ls_agg <- do.call("rbind", ls_agg)
   
-  rst_agg <- foreach(h = 1:ncol(ls_agg), .combine = raster::stack) %do% {
-    
-    val <- as.numeric(ls_agg[, h])                   
-    
-    tmp <- rst[[1]]
-    tmp[] <- val
-    
-    return(tmp)
+  rst_template <- rst[[1]]
+  lst_agg <- foreach(h = 1:ncol(ls_agg)) %do% {
+    raster::setValues(rst_template, as.numeric(ls_agg[, h]))
   }
   
-  
+  rst_agg <- raster::stack(lst_agg)
   
   if (save_output)
     rst_agg <- writeRaster(rst_agg, ...)
   
-  stopCluster(cl)
   return(rst_agg)
 }
