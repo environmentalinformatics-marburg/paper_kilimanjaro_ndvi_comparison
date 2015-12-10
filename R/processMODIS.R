@@ -9,7 +9,7 @@ rm(list = ls(all = TRUE))
 #         path_ext = "kilimanjaro/ndvi_comparison")
 
 library(Orcs)
-setwdOS(path_lin = "/media/fdetsch/modis_data/", path_win = "D:/", 
+setwdOS(path_lin = "/media/fdetsch/XChange/", path_win = "D:/", 
         path_ext = "kilimanjaro/ndvi_comparison")
 
 # packages
@@ -39,8 +39,8 @@ MODISoptions(localArcPath = paste0(getwd(), "/data/MODIS_ARC/"),
 ## Extract .hdf container files for further processing
 for (i in c("MOD13Q1", "MYD13Q1")) {
 
-  runGdal(i, tileH = 21, tileV = 9, job = paste0(i, ".005"), 
-          collection = "005",
+  runGdal(i, tileH = 21, tileV = 9, job = paste0(i, ".006"), 
+          collection = "006",
           SDSstring = "000000000010", outProj = "EPSG:21037")
 }
 
@@ -72,12 +72,12 @@ foreach(product = list("MOD13Q1", "MYD13Q1"),
         layers = lst_ndvi_qc, .packages = lib) %dopar% {
           
           ## initial files (for date information)
-          ndvi.fls.init <- list.files(paste0("data/MODIS_ARC/PROCESSED/", product, ".005"),
+          ndvi.fls.init <- list.files(paste0("data/MODIS_ARC/PROCESSED/", product, ".006"),
                                       pattern = paste(product, "NDVI.tif$", sep = ".*"), 
                                       full.names = TRUE, recursive = TRUE)
           
 #           ## application of whittaker smoothing algorithm
-            drs_wht <- paste0("data/rst/", product, ".005/whittaker")
+            drs_wht <- paste0("data/rst/", product, ".006/whittaker")
             rst.wht <- whittaker.raster(vi = layers, removeOutlier = TRUE, 
                                         threshold = 2000,
                                         timeInfo = orgTime(ndvi.fls.init, pillow = 0), 
@@ -90,7 +90,7 @@ foreach(product = list("MOD13Q1", "MYD13Q1"),
           fls_wht <- list.files(drs_wht, pattern = "^MCD.*yL6000.ndvi.tif$", 
                                 full.names = TRUE)
           rst_wht <- stack(fls_wht)
-          dir_scl <- paste0("data/rst/", product, ".005/whittaker_scl")
+          dir_scl <- paste0("data/rst/", product, ".006/whittaker_scl")
           fls_scl <- paste0(dir_scl, "/SCL_", names(rst_wht))
           
           lst_scl <- foreach(i = unstack(rst_wht), j = as.list(fls_scl), 
@@ -124,10 +124,10 @@ foreach(product = list("MOD13Q1", "MYD13Q1"),
           yearmon_agg <- as.yearmon(dates_agg)
           indices_agg <- as.numeric(as.factor(yearmon_agg))
           
-          outdir <- paste0("data/rst/", product, ".005/whittaker")
+          outdir <- paste0("data/rst/", product, ".006/whittaker")
           
           # composite day of the year
-          fls_doy <- list.files(paste0("data/rst/", product, ".005/crp"), 
+          fls_doy <- list.files(paste0("data/rst/", product, ".006/crp"), 
                                 full.names = TRUE,
                                 pattern = paste0("^CRP_", toupper(product), ".*composite"))
           rst_doy <- stack(fls_doy)
@@ -137,7 +137,17 @@ foreach(product = list("MOD13Q1", "MYD13Q1"),
           months_doy <- unique(strftime(as.Date(as.character(dates_doy), 
                                                 format = "%Y%j"), "%Y%m"))
   
-          file_out <- paste0("data/rst/", product, ".005/whittaker_mvc/MVC")
+          file_out <- paste0("data/rst/", product, ".006/whittaker_mvc/MVC")
+          
+          #           id_start <- grep("2013", fls_doy)[1]
+          #           
+          #           id_end <- grep("2014", fls_doy)
+          #           id_end <- id_end[length(id_end)]
+          #           
+          #           rst_scl <- rst_scl[[id_start:id_end]]
+          #           rst_doy <- rst_doy[[id_start:id_end]]
+          #           dates_doy <- dates_doy[id_start:id_end]
+          #           months_doy <- months_doy[127:(127+23)]
           
           # aggregate to maximum value composites (mvc)
           rst_wht_mvc <- aggregateNDVICells(rst = rst_scl, 
