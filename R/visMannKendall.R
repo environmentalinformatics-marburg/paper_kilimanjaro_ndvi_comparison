@@ -62,7 +62,7 @@ visMannKendall <- function(rst, dem, max_ele,
     
     # write to file
     lst_out <- foreach::foreach(i = 1:2, j = c(file_tau, file_p)) %do% {
-      raster::writeRaster(rst_out[[i]], filename = j, ...)
+      raster::writeRaster(rst_out[[i]], filename = j, overwrite = TRUE, ...)
     }
     
     ndvi.mk <- raster::stack(lst_out)

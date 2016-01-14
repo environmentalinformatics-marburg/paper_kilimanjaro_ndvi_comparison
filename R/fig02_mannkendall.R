@@ -5,7 +5,7 @@ rm(list = ls(all = TRUE))
 
 ## packages
 lib <- c("grid", "Rsenal", "foreach", "latticeExtra", "ggplot2", 
-         "Orcs")
+         "Orcs", "gimms")
 Orcs::loadPkgs(lib)
 
 ## functions
@@ -15,8 +15,8 @@ source("R/visMannKendall.R")
 source("R/visDensity.R")
 
 ## folders
-ch_dir_extdata <- "/media/dogbert/XChange/kilimanjaro/ndvi_comparison/data/rst/"
-ch_dir_outdata <- "/media/dogbert/XChange/kilimanjaro/ndvi_comparison/out/"
+ch_dir_extdata <- "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/data/rst/"
+ch_dir_outdata <- "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/out/"
 
 ### data processing
 
@@ -24,8 +24,6 @@ ch_dir_outdata <- "/media/dogbert/XChange/kilimanjaro/ndvi_comparison/out/"
 ch_fls_dem <- paste0(ch_dir_extdata, "../dem/DEM_ARC1960_30m_Hemp.tif")
 rst_dem <- raster(ch_fls_dem)
 rst_dem <- aggregate(rst_dem, fact = 10)
-rst_dem <- projectRaster(rst_dem, crs = "+init=epsg:4326")
-p_dem <- visDEM(rst_dem, labcex = .6, cex = 1.6, col = "black")
 
 ## reference extent
 fls_ndvi <- paste0(ch_dir_extdata, "MOD13Q1.006/whittaker_dsn/DSN_SCL_MVC_200301.tif")
@@ -43,6 +41,9 @@ num_ymax <- ymax(rst_ndvi)
 rst_gimms <- raster(paste0(ch_dir_outdata, "/GIMMS3g_mk_0312_tau.tif"))
 rst_gimms <- projectRaster(rst_gimms, crs = "+init=epsg:4326")
 spy_gimms <- rasterToPolygons(rst_gimms)
+
+## non-vegetated modis pixels
+modis_nonveg <- readRDS("data/modis_nonvegetated.rds")
 
 ## study area
 rst_kili <- kiliAerial(upperLeft = c(num_ymax, num_xmin), 
@@ -115,22 +116,33 @@ lst_p_mk <- lapply(c(.05, .001), function(p_value) {
   foreach(i = products, txt = labels, 
           .export = ls(envir = environment())) %do% {
     
-    fls_ndvi <- list.files(paste0(ch_dir_extdata, i), recursive = TRUE,
-                           pattern = "^DSN_.*.tif$", full.names = TRUE)
+    # list avl files  
+    fls_ndvi <- if (i == "GIMMS3g") {
+      rearrangeFiles(dsn = paste0(ch_dir_extdata, i), pattern = "^DSN_.*.tif$", 
+                     pos = c(4, 6, 11) + 27, full.names = TRUE, 
+                     recursive = TRUE)
+    } else {
+      list.files(paste0(ch_dir_extdata, i), pattern = "^DSN_.*.tif$", 
+                 full.names = TRUE, recursive = TRUE)
+    }
     
-    st <- grep(st_year, fls_ndvi)[1]
-    nd <- grep(nd_year, fls_ndvi)[length(grep(nd_year, fls_ndvi))]
-    
+    # import temporal subset
+    st <- grep(ifelse(i == "GIMMS3g", "03jan", st_year), fls_ndvi)[1]
+    nd <- grep(ifelse(i == "GIMMS3g", "12dec", nd_year), fls_ndvi)
+    nd <- nd[length(nd)]
+            
     fls_ndvi <- fls_ndvi[st:nd]
     rst_ndvi <- stack(fls_ndvi)
     
-    p <- visMannKendall(rst = rst_ndvi, dem = rst_dem, max_ele = 4000,
-                        
+    if (i != "GIMMS3g")
+      rst_ndvi[modis_nonveg] <- NA
+      
+    p <- visMannKendall(rst = rst_ndvi, 
                         xlab = "", ylab = "",
                         p_value = p_value, crs = "+init=epsg:4326",
                         filename = paste0(ch_dir_outdata, i, "_mk_0312.tif"), 
-                        at = seq(-.55, .55, .01), cores = 3L, 
-                        format = "GTiff", overwrite = TRUE, 
+                        at = seq(-.55, .55, .01), 
+                        format = "GTiff", 
                         xlim = c(num_xmin, num_xmax), 
                         ylim = c(num_ymin, num_ymax), 
                         scales = list(draw = TRUE, cex = .5, 
@@ -160,6 +172,8 @@ lst_p_mk <- lapply(c(.05, .001), function(p_value) {
 p_mk_comb <- latticeCombineGrid(append(list(p_bing), lst_p_mk[[1]]), 
                                 layout = c(2, 3))
 
+rst_dem <- projectRaster(rst_dem, crs = "+init=epsg:4326")
+p_dem <- visDEM(rst_dem, labcex = .6, cex = 1.6, col = "black")
 p_mk_comb <- p_mk_comb + 
   latticeExtra::as.layer(p_dem)
 
@@ -213,7 +227,7 @@ print(p_topo, newpage = FALSE)
 # add equator label
 downViewport(trellis.vpname("figure"))
 grid.text(x = .05, y = .38, just = c("left", "bottom"), label = "Eq.", 
-          gp = gpar(cex = .3))
+          gp = gpar(cex = .5))
 
 dev.off()
 
@@ -265,7 +279,7 @@ print(p_topo, newpage = FALSE)
 # add equator label
 downViewport(trellis.vpname("figure"))
 grid.text(x = .05, y = .38, just = c("left", "bottom"), label = "Eq.", 
-          gp = gpar(cex = .3))
+          gp = gpar(cex = .5))
 
 dev.off()
 
