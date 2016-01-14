@@ -1,4 +1,4 @@
-qcMCD13 <- function(product, ref_ext, 
+qcMCD13 <- function(product, ref_ext, type = c("tile", "cmg"), doy = TRUE, 
                     inpath = options()$MODIS_outDirPath, dsn = getwd(), 
                     apply_crop = TRUE, apply_qc = TRUE, 
                     apply_tso = TRUE, apply_adj = TRUE,
@@ -14,14 +14,23 @@ qcMCD13 <- function(product, ref_ext,
     doParallel::registerDoParallel(cl)
   }
   
+  type <- type[1]
+  
   ## modis file patterns
-  pttrn <- paste(product, c("NDVI.tif$", "pixel_reliability.tif$", 
-                            "composite_day_of_the_year.tif$"), sep = ".*")
+  pttrn <- if (doy) {
+    paste(product, c("NDVI.tif$", "pixel_reliability.tif$", 
+                     "composite_day_of_the_year.tif$"), sep = ".*")
+  } else {
+    paste(product, c("NDVI.tif$", "pixel_reliability.tif$"), sep = ".*")
+  }
   
   ## crop
-  cat("Initializing 'crop' ...\n")
-  
+  if (!dir.exists(dsn))
+    dir.create(dsn)
+    
   if (!missing(ref_ext) & apply_crop) {
+    cat("Initializing 'crop' ...\n")
+    
     suppressWarnings(
       ndvi.rst <- foreach(i = pttrn, .packages = lib, 
                           .export = ls(envir = globalenv())) %dopar% {                                      
@@ -37,10 +46,10 @@ qcMCD13 <- function(product, ref_ext,
                             
                             # stack, crop and store
                             rst <- raster::stack(fls)
-                            rst.crp <- raster::crop(rst, ref_ext)
-                            writeRaster(rst.crp, format = "GTiff", overwrite = TRUE,
-                                        filename = paste0(dsn_crp, "/CRP"), 
-                                        bylayer = TRUE, suffix = names(rst))
+                            raster::crop(rst, ref_ext, snap = "out", 
+                                         format = "GTiff", overwrite = TRUE,
+                                         filename = paste0(dsn_crp, "/CRP"), 
+                                         bylayer = TRUE, suffix = names(rst))
                           }
     )
     
@@ -58,10 +67,11 @@ qcMCD13 <- function(product, ref_ext,
   }
 
   ## quality assurance
-  cat("Initializing 'overlay' ...\n")
   
   # overlay ndvi and qa layers
   if (apply_qc) {
+    cat("Initializing 'overlay' ...\n")
+    
     dsn_qa <- paste0(dsn, "/qa")
     if (!dir.exists(dsn_qa))
       dir.create(dsn_qa)
@@ -84,13 +94,17 @@ qcMCD13 <- function(product, ref_ext,
     fls_qa <- list.files(paste0(dsn, "/qa"), pattern = "^QA.*.tif$", 
                          full.names = TRUE)
     ndvi.rst.qa <- raster::stack(fls_qa)
-  }    
+  }  
+  
+  if (type == "cmg")
+    return(ndvi.rst.qa)
   
   ## additional outlier check
-  cat("Initializing 'tsOutliers' ...\n")
   
   # calc, tsOutliers
   if (apply_tso) {
+    cat("Initializing 'tsOutliers' ...\n")
+    
     ndvi_mat_qa <- raster::as.matrix(ndvi.rst.qa)
     ndvi_rst_sd <- ndvi.rst.qa
     
@@ -124,10 +138,11 @@ qcMCD13 <- function(product, ref_ext,
   }
   
   ## reject neighboring pixels
-  cat("Initializing 'adjacent' ...\n")
   
   # adjacent
   if (apply_adj) {
+    cat("Initializing 'adjacent' ...\n")
+    
     suppressWarnings(
       lst_ndvi_fc <- foreach(i = unstack(ndvi_rst_sd), .packages = lib, 
                              .export = ls(envir = globalenv())) %dopar% {
