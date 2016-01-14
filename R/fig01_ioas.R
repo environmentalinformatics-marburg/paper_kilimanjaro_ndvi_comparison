@@ -5,7 +5,7 @@ rm(list = ls(all = TRUE))
 
 ## packages
 lib <- c("doParallel", "Rsenal", "rgdal", "stargazer", "RColorBrewer", "grid", 
-         "lattice", "maptools")
+         "lattice", "maptools", "gimms")
 Orcs::loadPkgs(lib)
 
 ## functions
@@ -17,9 +17,9 @@ supcl <- makeCluster(3)
 registerDoParallel(supcl)
 
 ## folders
-ch_dir_data <- "/media/dogbert/XChange/kilimanjaro/ndvi_comparison/data/"
-ch_dir_extdata <- "/media/dogbert/XChange/kilimanjaro/ndvi_comparison/data/rst/"
-ch_dir_outdata <- "/media/dogbert/XChange/kilimanjaro/ndvi_comparison/out/"
+ch_dir_data <- "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/data/"
+ch_dir_extdata <- "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/data/rst/"
+ch_dir_outdata <- "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/out/"
 
 
 ### data processing
@@ -41,29 +41,34 @@ nd_year <- "2012"
 ## avl products and corresponding file patterns
 products <- c("GIMMS3g", 
               "MOD13Q1.005", "MYD13Q1.005", 
-              "MOD13Q1.006", "MYD13Q1.006")
+              "MOD13Q1.006", "MYD13Q1.006", 
+              "MOD13C2.005", "MYD13C2.005", 
+              "MOD13C2.006", "MYD13C2.006")
 
-pattern <- paste(c("^MVC_WHT", "^SCL_AGGMAX_WHT", "^SCL_AGGMAX_WHT", "^MVC", "^MVC"), 
-                 ".tif$", sep = ".*")
+pattern <- paste(c("^MVC_WHT", "^SCL_AGGMAX_WHT", "^SCL_AGGMAX_WHT", "^MVC", 
+                   "^MVC", rep("^AGG_WHT", 4)), ".tif$", sep = ".*")
 
 ## import data
-ls_rst_ndvi <- foreach(i = products, j = pattern, .packages = "raster") %dopar% {
+ls_rst_ndvi <- foreach(i = products, j = pattern, 
+                       .packages = c("raster", "gimms")) %dopar% {
     
-  # list avl files              
-  fls_ndvi <- list.files(paste0(ch_dir_extdata, i), 
-                         pattern = j, full.names = TRUE, recursive = TRUE)
+  # list avl files  
+  fls_ndvi <- if (i == "GIMMS3g") {
+    rearrangeFiles(dsn = paste0(ch_dir_extdata, i), pattern = j, 
+                   pos = c(4, 6, 11) + 23, full.names = TRUE, 
+                   recursive = TRUE)
+  } else {
+    list.files(paste0(ch_dir_extdata, i), 
+               pattern = j, full.names = TRUE, recursive = TRUE)
+  }
   
   # import temporal subset
-  st <- grep(st_year, fls_ndvi)[1]
-  nd <- grep(nd_year, fls_ndvi)[length(grep(nd_year, fls_ndvi))]
+  st <- grep(ifelse(i == "GIMMS3g", "03jan", st_year), fls_ndvi)[1]
+  nd <- grep(ifelse(i == "GIMMS3g", "12dec", nd_year), fls_ndvi)
+  nd <- nd[length(nd)]
   
   fls_ndvi <- fls_ndvi[st:nd]
   rst_ndvi <- stack(fls_ndvi)
-  
-  if (i == "GIMMS3g") {
-    spy <- rasterToPolygons(rst_ndvi[[1]])
-    rst_ndvi <- crop(rst_ndvi, spy)
-  }
   
   if (i %in% c("MOD13Q1.006", "MYD13Q1.006"))
     rst_ndvi <- crop(rst_ndvi, rst_ref)
@@ -71,14 +76,58 @@ ls_rst_ndvi <- foreach(i = products, j = pattern, .packages = "raster") %dopar% 
   return(rst_ndvi)
 }
 
+
+### long-term means ------------------------------------------------------------
+
+# ## calculate long-term means
+# dir_ltm <- paste0(ch_dir_outdata, "ltm/")
+# lst_ltm <- foreach(i = ls_rst_ndvi, j = products, .packages = "raster") %dopar% {
+#   fls_ltm <- paste0(dir_ltm, "LTM_", j, ".tif")
+#   
+#   if (file.exists(fls_ltm))
+#     raster(fls_ltm)
+#   else
+#     overlay(i, fun = function(...) mean(..., na.rm = TRUE), 
+#             filename = fls_ltm, format = "GTiff", overwrite = TRUE)
+# }
+
+## create modis mask for non-vegetated surfaces (tile products, ndvi < 0.15; 
+## see also wittich and hansing 1995)
+# rst_ltm_modis <- stack(lst_ltm[2:5])
+# rst_ltm_valid <- overlay(rst_ltm_modis, fun = function(w, x, y, z) {
+#   w_num <- w[]; x_num <- x[]; y_num <- y[]; z_num <- z[]
+#   
+#   out <- rep(1, length(w_num))
+#   out[w_num < .15 | x_num < .15 | y_num < .15 | z_num < .15] <- 0
+#   return(out)
+# })
+# 
+# modis_nonveg <- which(rst_ltm_valid[] == 0)
+# saveRDS(modis_nonveg, file = "data/modis_nonvegetated.rds")
+modis_nonveg <- readRDS("data/modis_nonvegetated.rds")
+
+# create modis mask for non-vegetated surfaces (cmg products, ndvi < 0.15)
+# rst_ltm_modis <- stack(lst_ltm[6:9])
+# rst_ltm_valid <- overlay(rst_ltm_modis, fun = function(w, x, y, z) {
+#   w_num <- w[]; x_num <- x[]; y_num <- y[]; z_num <- z[]
+#   
+#   out <- rep(1, length(w_num))
+#   out[w_num < .15 | x_num < .15 | y_num < .15 | z_num < .15] <- 0
+#   return(out)
+# })
+# 
+# modis_nonveg_cmg <- which(rst_ltm_valid[] == 0)
+# saveRDS(modis_nonveg_cmg, file = "data/modis_nonvegetated_cmg.rds")
+modis_nonveg_cmg <- readRDS("data/modis_nonvegetated_cmg.rds")
+
 ## cells inside national park
 # gimms_inside <- insideNP(ls_rst_ndvi[[1]][[1]], spy_np, id = TRUE)
 # saveRDS(gimms_inside, file = "data/gimms_inside_np.rds")
-gimms_inside <- readRDS("data/gimms_inside_np.rds")
+# gimms_inside <- readRDS("data/gimms_inside_np.rds")
 
 # modis_inside <- insideNP(ls_rst_ndvi[[2]][[1]], spy_np, id = TRUE)
 # saveRDS(modis_inside, file = "data/modis_inside_np.rds")
-modis_inside <- readRDS("data/modis_inside_np.rds")
+# modis_inside <- readRDS("data/modis_inside_np.rds")
 
 ## cells above 4,000 m
 ch_fls_dem <- paste0(ch_dir_extdata, "../dem/DEM_ARC1960_30m_Hemp.tif")
@@ -89,19 +138,19 @@ rst_dem <- raster(ch_fls_dem)
 # 
 # gimms_summit <- insideNP(ls_rst_ndvi[[1]][[1]], spy_dem, limit = .2, id = TRUE)
 # saveRDS(gimms_summit, file = "data/gimms_near_summit.rds")
-gimms_summit <- readRDS("data/gimms_near_summit.rds")
+# gimms_summit <- readRDS("data/gimms_near_summit.rds")
 # 
 # modis_summit <- insideNP(ls_rst_ndvi[[2]][[1]], spy_dem, limit = .2, id = TRUE)
 # saveRDS(modis_summit, file = "data/modis_near_summit.rds")
-modis_summit <- readRDS("data/modis_near_summit.rds")
+# modis_summit <- readRDS("data/modis_near_summit.rds")
 
-# # calculate ioa
-# dat_ioa <- foreach(i = 1:length(ls_rst_ndvi), .combine = "rbind") %do% {
+# calculate ioa
+# dat_ioa <- foreach(i = 1:5, .combine = "rbind") %do% {
 #   
 #   # status message
 #   cat("Processing list entry no. ", i, "...\n", sep = "")
 #   
-#   foreach(j = 1:length(ls_rst_ndvi), .combine = "rbind", 
+#   foreach(j = 1:5, .combine = "rbind", 
 #           .packages = c("raster", "Rsenal")) %dopar% {
 #     
 #     # if stacks are identical, ioa equals 1        
@@ -111,23 +160,31 @@ modis_summit <- readRDS("data/modis_near_summit.rds")
 #       
 #       rst1 <- ls_rst_ndvi[[i]]
 #       
-#       # reject cells located above 4,000 m a.s.l.
-#       rst1[if (i == 1) gimms_summit else modis_summit] <- NA
+#       # # reject cells located above 4,000 m a.s.l.
+#       # rst1[if (i == 1) gimms_summit else modis_summit] <- NA
+#       
+#       # discard non-vegetated pixels
+#       if (i != 1) {
+#         rst1[modis_nonveg] <- NA
+#       } else {
+#         rst1[modis_nonveg_cmg] <- NA
+#       }
 # 
 #       # resample modis
 #       if (i == 1 & j != 1) {
-#         rst2 <- resample(ls_rst_ndvi[[j]], rst1)
-#         rst2[gimms_summit] <- NA
+#         # rst2 <- resample(ls_rst_ndvi[[j]], rst1)
+#         rst2 <- ls_rst_ndvi[[j+4]]
+#         rst2[modis_nonveg_cmg] <- NA
+#         
 #       } else if (i > 1 & j > 1) {
 #         rst2 <- ls_rst_ndvi[[j]]
-#         rst2[modis_summit] <- NA
+#         rst2[modis_nonveg] <- NA
 # 
 #       } else if (i != 1 & j == 1) {
+#         rst1 <- ls_rst_ndvi[[i+4]]
+#         rst1[modis_nonveg_cmg] <- NA
 #         rst2 <- ls_rst_ndvi[[j]]
-#         rst2[gimms_summit] <- NA
-#         
-#         rst1 <- resample(rst1, rst2)
-#         rst1[gimms_summit] <- NA
+#         rst2[modis_nonveg_cmg] <- NA
 #       }
 #       
 #       # extract values
@@ -301,18 +358,16 @@ p_bing <- spplot(rst_kili[[1]], col.regions = NA, colorkey = FALSE,
 ## insert values
 ## gimms stack
 rst1 <- ls_rst_ndvi[[1]]
-rst1[gimms_summit] <- NA
+rst1[modis_nonveg_cmg] <- NA
 val1 <- rst1[]
 
 ## loop over modis stacks
-dat_ioa <- foreach(j = 2:length(ls_rst_ndvi), .combine = "cbind",
+dat_ioa <- foreach(j = 6:length(ls_rst_ndvi), .combine = "cbind",
                    .packages = c("raster", "Rsenal")) %dopar% {
                      
-                     # resample modis
-                     rst2 <- resample(ls_rst_ndvi[[j]], rst1)
-                     rst2[gimms_summit] <- NA
-                     
-                     # extract values
+                     # modis stack
+                     rst2 <- ls_rst_ndvi[[j]]
+                     rst2[modis_nonveg_cmg] <- NA
                      val2 <- rst2[]
                      
                      # calculate ioa
@@ -351,7 +406,7 @@ p_bing <- p_bing +
 p_ioa_gimms <- spplot(rst_ioa_gimms, col.regions = envinmrPalette(500), 
                       xlim = c(num_xmin, num_xmax), 
                       ylim = c(num_ymin, num_ymax), 
-                      at = seq(.375, .975, .005), 
+                      at = seq(.425, .975, .005), 
                       colorkey = list(space = "top", labels = list(cex = .8), width = .7),
                       scales = list(draw = TRUE), alpha.regions = 1) + 
   latticeExtra::layer(sp.text("b)", loc = c(37.02, -2.86), font = 2, cex = .6, 
@@ -365,8 +420,9 @@ p_ioa_comb <- p_ioa_comb +
                                   lwd = 1, lty = 3, col = "white")) + 
   latticeExtra::as.layer(p_dem)
 
+install.packages("inst/extdata/ggplot2_1.0.1.tar.gz", repos = NULL)
 source("R/fig01_homogeneities.R")
-g_cellts <- ggplotGrob(p_cellts)
+g_cellts <- ggplot2::ggplotGrob(p_cellts)
 for (i in seq(3, 27, 4))
   g_cellts$heights[[i]] = unit(.1,"in")
 
@@ -433,3 +489,6 @@ dev.off()
 
 ## close parallel backend
 stopCluster(supcl)
+
+detach("package:ggplot2", unload=TRUE)
+install.packages("inst/extdata/ggplot2_2.0.0.tar.gz", repos = NULL)

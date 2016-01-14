@@ -40,12 +40,19 @@
 # lst_rst_ndvi <- foreach(i = products, j = pattern) %dopar% {
 #   
 #   # list avl files              
-#   fls_ndvi <- list.files(paste0(ch_dir_extdata, i), 
-#                          pattern = j, full.names = TRUE, recursive = TRUE)
+#   fls_ndvi <- if (i == "GIMMS3g") {
+#     rearrangeFiles(dsn = paste0(ch_dir_extdata, i), pattern = j, 
+#                    pos = c(4, 6, 11) + 23, full.names = TRUE, 
+#                    recursive = TRUE)
+#   } else {
+#     list.files(paste0(ch_dir_extdata, i), 
+#                pattern = j, full.names = TRUE, recursive = TRUE)
+#   }
 #   
 #   # import temporal subset
-#   st <- grep(st_year, fls_ndvi)[1]
-#   nd <- grep(nd_year, fls_ndvi)[length(grep(nd_year, fls_ndvi))]
+#   st <- grep(ifelse(i == "GIMMS3g", "03jan", st_year), fls_ndvi)[1]
+#   nd <- grep(ifelse(i == "GIMMS3g", "12dec", nd_year), fls_ndvi)
+#   nd <- nd[length(nd)]
 #   
 #   fls_ndvi <- fls_ndvi[st:nd]
 #   rst_ndvi <- raster::stack(fls_ndvi)
@@ -62,7 +69,20 @@
 # 
 # ## extract timestamps
 # dates <- names(rst_gimms)
-# dates <- substr(dates, nchar(dates) - 5, nchar(dates))
+# dates <- paste0(substr(dates, 27, 31), "01")
+# 
+# systime_locale <- Sys.getlocale(category = "LC_TIME")
+# if (Sys.info()[["sysname"]] == "Windows") {
+#   invisible(Sys.setlocale(category = "LC_TIME", locale = "C"))
+# } else {
+#   invisible(Sys.setlocale(category = "LC_TIME", locale = "en_US.UTF-8"))
+# }
+# 
+# dates <- strptime(dates, format = "%y%b%d")
+# dates <- strftime(dates, format = "%Y%m")
+# 
+# # revoke locale time adjustment
+# Sys.setlocale(category = "LC_TIME", locale = systime_locale)
 # 
 # ## reformat gimms data
 # mat_gimms <- getValues(lst_rst_ndvi[[1]])
@@ -166,7 +186,7 @@ p_cellts <- ggplot(aes(x = date, y = value, color = variable),
   scale_x_date(labels = date_format("%Y"), breaks = date_breaks("4 years"), 
                limits = as.Date(c("2003-01-01", "2012-12-01"))) + 
   scale_y_continuous(breaks = seq(0, .75, .25), 
-                     labels = c("0.0", "", "0.5", "")) + 
+                     labels = c("0.0", "0.25", "0.50", "0.75")) + 
   scale_colour_manual("", values = cols, 
                       labels = c(expression("NDVI"["3g"]), 
                                  expression("NDVI"["Aqua-C5"]))) + 
