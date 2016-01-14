@@ -27,7 +27,9 @@ invisible(
     pattern <- paste0("0312_tau", substr(p_value, 3, nchar(p_value)), ".tif$")
     
     fls_mk <- list.files(ch_dir_outdata, pattern = pattern, 
-                         full.names = TRUE)[c(1, 2, 4, 3, 5)]
+                         full.names = TRUE)
+    
+    fls_mk <- fls_mk[sapply(products, function(i) grep(i, fls_mk))]
     rst_mk <- lapply(fls_mk, raster)
     
     # loop over layers  
