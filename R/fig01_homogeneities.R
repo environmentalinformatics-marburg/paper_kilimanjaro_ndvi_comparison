@@ -31,37 +31,40 @@
 # ## avl products and corresponding file patterns
 # products <- c("GIMMS3g", 
 #               "MOD13Q1.005", "MYD13Q1.005", 
-#               "MOD13Q1.006", "MYD13Q1.006")
+#               "MOD13Q1.006", "MYD13Q1.006", 
+#               "MOD13C2.005", "MYD13C2.005", 
+#               "MOD13C2.006", "MYD13C2.006")
 # 
-# pattern <- paste(c("^MVC_WHT", "^SCL_AGGMAX_WHT", "^SCL_AGGMAX_WHT", "^MVC", "^MVC"), 
-#                  ".tif$", sep = ".*")
+# pattern <- paste(c("^MVC_WHT", "^SCL_AGGMAX_WHT", "^SCL_AGGMAX_WHT", "^MVC", 
+#                    "^MVC", rep("^AGG_WHT", 4)), ".tif$", sep = ".*")
 # 
-# ## import files
-# lst_rst_ndvi <- foreach(i = products, j = pattern) %dopar% {
-#   
-#   # list avl files              
-#   fls_ndvi <- if (i == "GIMMS3g") {
-#     rearrangeFiles(dsn = paste0(ch_dir_extdata, i), pattern = j, 
-#                    pos = c(4, 6, 11) + 23, full.names = TRUE, 
-#                    recursive = TRUE)
-#   } else {
-#     list.files(paste0(ch_dir_extdata, i), 
-#                pattern = j, full.names = TRUE, recursive = TRUE)
-#   }
-#   
-#   # import temporal subset
-#   st <- grep(ifelse(i == "GIMMS3g", "03jan", st_year), fls_ndvi)[1]
-#   nd <- grep(ifelse(i == "GIMMS3g", "12dec", nd_year), fls_ndvi)
-#   nd <- nd[length(nd)]
-#   
-#   fls_ndvi <- fls_ndvi[st:nd]
-#   rst_ndvi <- raster::stack(fls_ndvi)
-#   
-#   if (i %in% c("MOD13Q1.006", "MYD13Q1.006"))
-#     rst_ndvi <- raster::crop(rst_ndvi, rst_ref)
-#   
-#   return(rst_ndvi)
-# }
+# ## import data
+# lst_rst_ndvi <- foreach(i = products, j = pattern, 
+#                        .packages = c("raster", "gimms")) %dopar% {
+#                          
+#                          # list avl files  
+#                          fls_ndvi <- if (i == "GIMMS3g") {
+#                            rearrangeFiles(dsn = paste0(ch_dir_extdata, i), pattern = j, 
+#                                           pos = c(4, 6, 11) + 23, full.names = TRUE, 
+#                                           recursive = TRUE)
+#                          } else {
+#                            list.files(paste0(ch_dir_extdata, i), 
+#                                       pattern = j, full.names = TRUE, recursive = TRUE)
+#                          }
+#                          
+#                          # import temporal subset
+#                          st <- grep(ifelse(i == "GIMMS3g", "03jan", st_year), fls_ndvi)[1]
+#                          nd <- grep(ifelse(i == "GIMMS3g", "12dec", nd_year), fls_ndvi)
+#                          nd <- nd[length(nd)]
+#                          
+#                          fls_ndvi <- fls_ndvi[st:nd]
+#                          rst_ndvi <- stack(fls_ndvi)
+#                          
+#                          if (i %in% c("MOD13Q1.006", "MYD13Q1.006"))
+#                            rst_ndvi <- crop(rst_ndvi, rst_ref)
+#                          
+#                          return(rst_ndvi)
+#                        }
 # 
 # ## create gimms grid template
 # rst_gimms <- lst_rst_ndvi[[1]]
@@ -93,11 +96,10 @@
 # 
 # ### MODIS
 # 
-# ## modis terra, collection 5
+# ## modis aqua, collection 5
 # rst_modis <- lst_rst_ndvi[[3]]
 # mat_modis <- as.matrix(rst_modis)
 # lst_cells <- cellFromPolygon(rst_modis[[3]], spy_gimms)
-# 
 # 
 # ## calculate statistics per gimms cell
 # lst_stats <- foreach(i = lst_cells) %do% {
@@ -120,6 +122,14 @@
 #              "quan90" = mat_quan[3, ])
 # }
 # 
+# ## modis aqua, collection 5
+# rst_modis_cmg <- lst_rst_ndvi[[7]]
+# mat_modis_cmg <- as.matrix(rst_modis_cmg)
+# 
+# for (i in 1:length(lst_stats)) {
+#   lst_stats[[i]]$mean <- mat_modis_cmg[i, ]
+# }
+# 
 # ## reformat data to match up with the gimms dataset
 # lst_mlt <- foreach(i = 1:4, j = c("mean", "quan10", "quan50", "quan90")) %do% {
 #   mat <- t(sapply(lst_stats, "[[", i))
@@ -136,10 +146,10 @@
 # dat_mlt$cell <- factor(dat_mlt$cell)
 # dat_mlt$date <- as.Date(paste0(dat_mlt$month, "01"), format = "%Y%m%d")
 # 
-# saveRDS(dat_mlt, file = "data/cellstats.rds")
+# saveRDS(dat_mlt, file = "data/cellstats_cmg.rds")
 
 ## reimport data
-dat_mlt <- readRDS("data/cellstats.rds")
+dat_mlt <- readRDS("data/cellstats_cmg.rds")
 
 ## create figure 
 library(ggplot2)
@@ -167,7 +177,7 @@ library(scales)
 dat_mlt <- dat_mlt[, c(1, 2, 8, 3, 4, 5, 7)]
 dat_mlt2 <- reshape2::melt(dat_mlt, id.vars = c(1:3, 6:7))
 
-dat_mlt2[dat_mlt2$cell %in% c(23, 32, 33), c("quan10", "quan90", "value")] <- NA
+dat_mlt2[dat_mlt2$cell == 23, c("quan10", "quan90", "value")] <- NA
 
 cols <- brewer.pal(4, "PuOr")[c(1, 4)]
 names(cols) <- c("mean", "gimms")
