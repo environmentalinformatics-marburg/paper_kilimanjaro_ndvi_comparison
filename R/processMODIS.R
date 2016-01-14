@@ -25,13 +25,14 @@ source("src/aggregateNDVICells.R")
 
 ### Data import
 
-# ## re-organize files
-# orgStruc(move = TRUE)
+## re-organize files
+orgStruc(move = TRUE)
 
 ## 'MODIS' global settings
 MODISoptions(localArcPath = paste0(getwd(), "/data/MODIS_ARC/"), 
              outDirPath = paste0(getwd(), "/data/MODIS_ARC/PROCESSED/"), 
-             MODISserverOrder = c("LAADS","LPDAAC"), quiet = TRUE)
+             MODISserverOrder = c("LPDAAC", "LAADS"), quiet = TRUE, 
+             outProj = "+init=epsg:21037")
 
 ## Extract .hdf container files for further processing
 for (i in c("MOD13Q1", "MYD13Q1")) {
@@ -40,6 +41,12 @@ for (i in c("MOD13Q1", "MYD13Q1")) {
           collection = "006",
           SDSstring = "000000000010", outProj = "EPSG:21037")
 }
+
+for (i in c("MOD13C2", "MYD13C2")) {
+  runGdal(i, job = paste0(i, ".006"), 
+          collection = "006", SDSstring = "1000000000001")
+}
+
 
 ## geographic extent
 rst_kili <- kiliAerial(minNumTiles = 20L)
