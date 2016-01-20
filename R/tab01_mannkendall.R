@@ -25,7 +25,9 @@ labels <- c("NDVI\\textsubscript{3g}",
 
 ## statistics (p < 0.05)
 fls_mk05 <- list.files(ch_dir_outdata, pattern = "0312_tau05.tif$", 
-                        full.names = TRUE)[c(1, 2, 4, 3, 5)]
+                        full.names = TRUE)
+fls_mk05 <- fls_mk05[-grep("13C2", fls_mk05)]
+fls_mk05 <- fls_mk05[c(1, 2, 4, 3, 5)]
 rst_mk05 <- lapply(fls_mk05, raster)
 
 # trend differences
@@ -47,7 +49,9 @@ stargazer(df_mk_stats, summary = FALSE)
 
 ## statistics (p < 0.001)
 fls_mk001 <- list.files(ch_dir_outdata, pattern = "0312_tau001.tif$", 
-                       full.names = TRUE)[c(1, 2, 4, 3, 5)]
+                       full.names = TRUE)
+fls_mk001 <- fls_mk001[-grep("13C2", fls_mk001)]
+fls_mk001 <- fls_mk001[c(1, 2, 4, 3, 5)]
 rst_mk001 <- lapply(fls_mk001, raster)
 
 # trend differences

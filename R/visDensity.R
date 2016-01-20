@@ -10,8 +10,8 @@ visDensity <- function(dsn = getwd(), p = 0.001, combined = TRUE) {
   
   ## trend values depending on 'p'
   fls_mk <- list.files(dsn, 
-                       pattern = paste0("mk_0312_tau", substr(p, 3, nchar(p))),
-                       full.names = TRUE)[c(2, 4, 3, 5)]
+                       pattern = paste0("Q1.*mk_0312_tau", substr(p, 3, nchar(p))),
+                       full.names = TRUE)[c(1, 3, 2, 4)]
   rst_mk <- lapply(fls_mk, raster)
   dat_mk <- foreach(i = 1:length(rst_mk), .combine = "rbind") %do% {
     val_mk <- getValues(rst_mk[[i]])

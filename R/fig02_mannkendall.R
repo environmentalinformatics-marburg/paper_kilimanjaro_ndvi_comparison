@@ -51,10 +51,10 @@ rst_kili <- kiliAerial(upperLeft = c(num_ymax, num_xmin),
                        minNumTiles = 12L, projection = "+init=epsg:4326")
 
 # create figure
-scale <- list("SpatialPolygonsRescale", layout.scale.bar(), scale = 0.1001712, 
+scale <- list("SpatialPolygonsRescale", layout.scale.bar(), scale = 0.08998623, 
               offset = c(37.05, -3.38), fill = c("transparent", "black"))
-text1 = list("sp.text", c(37.05, -3.36), "0", cex = .5)
-text2 = list("sp.text", c(37.16, -3.36), "10 km", cex = .5)
+text1 = list("sp.text", c(37.05, -3.36), "0", cex = .5, font = 2)
+text2 = list("sp.text", c(37.1575, -3.36), "10 km", cex = .5, font = 2)
 
 arrow <- list("SpatialPolygonsRescale", layout.north.arrow(type = 1), 
               offset = c(37, -3.41), scale = .075)
@@ -197,7 +197,7 @@ draw.colorkey(key = list(col = colorRampPalette(brewer.pal(11, "BrBG")),
                          width = .6, height = .5,
                          at = seq(-.55, .55, .01), 
                          space = "bottom"), draw = TRUE)
-grid.text(expression("Kendall's " ~ tau), x = 0.5, y = .9, just = c("centre", "top"), 
+grid.text(bquote(bold("Kendall's " ~ tau)), x = 0.5, y = .9, just = c("centre", "top"), 
           gp = gpar(font = 2, cex = .85))
 
 # add density plot #1
@@ -249,7 +249,7 @@ draw.colorkey(key = list(col = colorRampPalette(brewer.pal(11, "BrBG")),
                          width = .6, height = .5,
                          at = seq(-.55, .55, .01), 
                          space = "bottom"), draw = TRUE)
-grid.text(expression("Kendall's " ~ tau), x = 0.5, y = .9, just = c("centre", "top"), 
+grid.text(bquote(bold("Kendall's " ~ tau)), x = 0.5, y = .9, just = c("centre", "top"), 
           gp = gpar(font = 2, cex = .85))
 
 # add density plot #1

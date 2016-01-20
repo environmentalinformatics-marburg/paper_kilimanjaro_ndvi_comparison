@@ -205,8 +205,8 @@ rst_dem <- raster(ch_fls_dem)
 load("data/ioa.RData")
 
 ## reformat table
-out <- matrix(ncol = 5, nrow = length(products))
-for (i in 1:length(products)) {
+out <- matrix(ncol = 5, nrow = 5)
+for (i in 1:5) {
   sub <- subset(dat_ioa, ref1 == products[i])
   out[i, ] <- sub$ioa
 }
@@ -214,8 +214,12 @@ for (i in 1:length(products)) {
 out <- round(out, 3)
 out <- data.frame(out)
 products[1] <- "GIMMS NDVI3g"
-rownames(out) <- products
-colnames(out) <- products
+rownames(out) <- products[1:5]
+colnames(out) <- products[1:5]
+
+# # csv output
+# write.csv(out, "/media/fdetsch/XChange/kilimanjaro/ndvi_comparison/pub/data/ioas.csv", 
+#           quote = FALSE)
 
 # latex output
 stargazer(out, summary = FALSE)
@@ -333,10 +337,10 @@ rst_kili <- kiliAerial(upperLeft = c(num_ymax, num_xmin),
 #                                y = list(at = seq(-2.9, -3.3, -.2))))
 
 # create figure (google)
-scale <- list("SpatialPolygonsRescale", layout.scale.bar(), scale = 0.1001712, 
+scale <- list("SpatialPolygonsRescale", layout.scale.bar(), scale = 0.08998623, 
               offset = c(37.05, -3.38), fill = c("transparent", "black"))
-text1 = list("sp.text", c(37.05, -3.36), "0", cex = .5)
-text2 = list("sp.text", c(37.16, -3.36), "10 km", cex = .5)
+text1 = list("sp.text", c(37.05, -3.36), "0", cex = .5, font = 2)
+text2 = list("sp.text", c(37.1575, -3.36), "10 km", cex = .5, font = 2)
 
 arrow <- list("SpatialPolygonsRescale", layout.north.arrow(type = 1), 
              offset = c(37, -3.41), scale = .075)
