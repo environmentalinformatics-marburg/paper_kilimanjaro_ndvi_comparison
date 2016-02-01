@@ -1,13 +1,15 @@
 ### environmental stuff
 
 # working directory
+path_pkg <- getwd()
+
 library(Orcs)
 setwdOS(path_lin = "/media/fdetsch/XChange/", path_win = "D:/",
         path_ext = "kilimanjaro/ndvi_comparison")
 
 ## install old 'MODIS' version (bug in MODIS_0.10-33::whittaker.raster has not 
 ## been fixed yet)
-install.packages("~/Downloads/MODIS_0.10-18.tar.gz", repos = NULL)
+install.packages(paste0(path_pkg, "inst/ex/MODIS_0.10-18.tar.gz"), repos = NULL)
 
 ## packages
 lib <- c("Rsenal", "gimms", "doParallel", "MODIS", "remote")
@@ -36,7 +38,7 @@ lst_gimms <- foreach(type = c("ndvi", "flag"), flag = c(FALSE, TRUE)) %do% {
   # rasterize ndvi
   dir_rst <- paste0(dir_base, "rst/", type, "/")
   fls_rst <- paste0(dir_rst, basename(fls_gimms), "_", type, ".tif")
-  rst <- rasterizeGimms(fls_gimms, cores = 3L, flag = flag,
+  rst <- rasterizeGimms(fls_gimms, cores = 2L, flag = flag,
                         filename = fls_rst, format = "GTiff", overwrite = TRUE)
   
   # crop
