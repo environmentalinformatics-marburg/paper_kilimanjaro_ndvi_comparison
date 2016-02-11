@@ -31,6 +31,7 @@ qcMCD13 <- function(product, ref_ext, type = c("tile", "cmg"), doy = TRUE,
   if (!missing(ref_ext) & apply_crop) {
     cat("Initializing 'crop' ...\n")
     
+    i <- 1
     suppressWarnings(
       ndvi.rst <- foreach(i = pttrn, .packages = lib, 
                           .export = ls(envir = globalenv())) %dopar% {                                      

@@ -20,7 +20,7 @@ loadPkgs(lib)
 
 ## functions
 source("/media/permanent/repositories/paper_kilimanjaro_ndvi_comparison/R/qcMCD13.R")
-source("src/aggregateNDVICells.R")
+source("/media/permanent/repositories/paper_kilimanjaro_ndvi_comparison/R/aggregateNDVICells.R")
 
 
 ### Data import
@@ -49,25 +49,26 @@ for (i in c("MOD13C2", "MYD13C2")) {
 
 
 ## geographic extent
-rst_kili <- kiliAerial(minNumTiles = 20L)
+# rst_kili <- kiliAerial(minNumTiles = 20L)
+rst_kili <- raster("data/rst/GIMMS3g/whittaker_mvc/MVC_WHT_QC_TRM_PRJ_CRP_geo00jan.tif")
 
 ## plots
 shp_plots <- suppressWarnings(
-  readOGR(dsn = "/media/permanent/kilimanjaro/coordinates/coords/", 
+  readOGR(dsn = "/media/permanent/kilimanjaro/coordinates/", 
           layer = "PlotPoles_ARC1960_mod_20140807_final", 
           p4s = "+init=epsg:21037"))
 shp_plots_amp <- subset(shp_plots, PoleType == "AMP")
 
 ## DEM
-rst_dem <- raster("/media/permanent/kilimanjaro/coordinates/coords/DEM_ARC1960_30m_Hemp.tif")
+rst_dem <- raster("/media/permanent/kilimanjaro/coordinates/DEM_ARC1960_30m_Hemp.tif")
 
 ## NDVI data
 lst_ndvi_qc <- lapply(c("MOD13Q1", "MYD13Q1"), function(product) {
   qcMCD13(product, ref_ext = rst_kili, 
           inpath = paste0(options()$MODIS_outDirPath, product, ".005"), 
           dsn = paste0("data/rst/", product, ".005/"), 
-          cores = 3L, apply_crop = FALSE, apply_qc = FALSE, 
-          apply_tso = FALSE, apply_adj = FALSE)
+          cores = 3L, apply_crop = TRUE, apply_qc = TRUE, 
+          apply_tso = TRUE, apply_adj = TRUE)
 })  
 
 ### Gap filling
