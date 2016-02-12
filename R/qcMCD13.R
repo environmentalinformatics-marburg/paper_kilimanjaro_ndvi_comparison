@@ -47,10 +47,19 @@ qcMCD13 <- function(product, ref_ext, type = c("tile", "cmg"), doy = TRUE,
                             
                             # stack, crop and store
                             rst <- raster::stack(fls)
-                            raster::crop(rst, ref_ext, snap = "out", 
-                                         format = "GTiff", overwrite = TRUE,
-                                         filename = paste0(dsn_crp, "/CRP"), 
-                                         bylayer = TRUE, suffix = names(rst))
+                            
+                            lst_out <- foreach(j = 1:nlayers(rst)) %do% {
+                              raster::crop(rst[[j]], ref_ext, snap = "out", 
+                                           format = "GTiff", overwrite = TRUE, 
+                                           filename = paste0(dsn_crp, "/CRP_", names(rst[[j]])))
+                            }
+                            
+                            raster::stack(lst_out)
+                            
+#                             raster::crop(rst, ref_ext, snap = "out", 
+#                                          format = "GTiff", overwrite = TRUE,
+#                                          filename = paste0(dsn_crp, "/CRP"), 
+#                                          bylayer = TRUE, suffix = names(rst))
                           }
     )
     
