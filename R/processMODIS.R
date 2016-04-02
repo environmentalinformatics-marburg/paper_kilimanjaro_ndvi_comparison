@@ -54,143 +54,158 @@ rst_kili <- raster("data/rst/GIMMS3g/whittaker_mvc/MVC_WHT_QC_TRM_PRJ_CRP_geo00j
 
 ## plots
 shp_plots <- suppressWarnings(
-  readOGR(dsn = "/media/permanent/kilimanjaro/coordinates/", 
-          layer = "PlotPoles_ARC1960_mod_20140807_final", 
+  readOGR(dsn = "data/shp", layer = "PlotPoles_ARC1960_mod_20140807_final", 
           p4s = "+init=epsg:21037"))
 shp_plots_amp <- subset(shp_plots, PoleType == "AMP")
 
 ## DEM
-rst_dem <- raster("/media/permanent/kilimanjaro/coordinates/DEM_ARC1960_30m_Hemp.tif")
+rst_dem <- raster("data/dem/DEM_ARC1960_30m_Hemp.tif")
 
 ## NDVI data
 lst_ndvi_qc <- lapply(c("MOD13Q1", "MYD13Q1"), function(product) {
   qcMCD13(product, ref_ext = rst_kili, 
-          inpath = paste0(options()$MODIS_outDirPath, product, ".005"), 
-          dsn = paste0("data/rst/", product, ".005/"), 
-          cores = 3L, apply_crop = TRUE, apply_qc = TRUE, 
-          apply_tso = TRUE, apply_adj = TRUE)
+          inpath = paste0(options()$MODIS_outDirPath, product, ".006"), 
+          dsn = paste0("data/rst/", product, ".006/"), 
+          cores = 3L, apply_crop = FALSE, apply_qc = FALSE, 
+          apply_tso = FALSE, apply_adj = FALSE)
 })  
 
 ### Gap filling
 
-lst_ndvi <- foreach(product = list("MOD13Q1", "MYD13Q1")) %do% {
+for (collection in c(".005", ".006")) {
   
-  ## initial files (for date information)
-  ndvi.fls.init <- list.files(paste0("data/MODIS_ARC/PROCESSED/", product, ".006"),
-                              pattern = paste(product, "NDVI.tif$", sep = ".*"), 
-                              full.names = TRUE, recursive = TRUE)
-  
-  ## application of whittaker smoothing algorithm
-  drs_wht <- paste0("data/rst/", product, ".006/whittaker")
-  #             rst.wht <- whittaker.raster(vi = layers, removeOutlier = TRUE, 
-  #                                         threshold = 2000,
-  #                                         timeInfo = orgTime(ndvi.fls.init, pillow = 0), 
-  #                                         lambda = 6000, nIter = 3, groupYears = FALSE, 
-  #                                         outDirPath = drs_wht, 
-  #                                         overwrite = TRUE, format = "raster")
-  
-  
-  # Application of scale factor and removal of inconsistent values
-  fls_wht <- list.files(drs_wht, pattern = "^MCD.*yL6000.ndvi.tif$", 
-                        full.names = TRUE)
-  rst_wht <- raster::stack(fls_wht)
-  dir_scl <- paste0("data/rst/", product, ".006/whittaker_scl")
-  fls_scl <- paste0(dir_scl, "/SCL_", names(rst_wht))
-  
-  #           lst_scl <- foreach(i = unstack(rst_wht), j = as.list(fls_scl), 
-  #                              .packages = c("raster", "rgdal"), 
-  #                              .export = ls(envir = globalenv())) %dopar% {  
-  #                                
-  #                                # scale factor                   
-  #                                rst <- i
-  #                                rst <- rst / 10000
-  #                                
-  #                                # rejection of inconsistent values
-  #                                id <- which(rst[] < -1 | rst[] > 1)
-  #                                
-  #                                if (length(id) > 0) {
-  #                                  rst[id] <- NA
-  #                                }
-  #                                
-  #                                # store
-  #                                rst <- writeRaster(rst, filename = j, format = "GTiff", overwrite = TRUE)
-  #                                
-  #                                return(rst)
-  #                              }
-  #           
-  #           rst_scl <- stack(lst_scl)
-  
-  fls_scl <- substr(fls_scl, 1, nchar(fls_scl) - 5)
-  fls_scl <- paste0(fls_scl, ".tif")
-  rst_scl <- raster::stack(fls_scl)
-  
-  ## monthly aggregation (shifted scaling and mvc creation; remember to 
-  ## adjust this when running the script the next time)
-  
-  dates <- MODIS::orgTime(ndvi.fls.init)$inputLayerDates
-  dates_agg <- dates + 8
-  yearmon_agg <- zoo::as.yearmon(dates_agg)
-  indices_agg <- as.numeric(as.factor(yearmon_agg))
-  
-  outdir <- paste0("data/rst/", product, ".006/whittaker")
-  
-  # composite day of the year
-  fls_doy <- list.files(paste0("data/rst/", product, ".006/crp"), 
-                        full.names = TRUE,
-                        pattern = paste0("^CRP_", toupper(product), ".*composite"))
-  rst_doy <- raster::stack(fls_doy)
-  
-  # output file
-  dates_doy <- as.numeric(substr(basename(fls_doy), 14, 20))
-  months_doy <- unique(strftime(as.Date(as.character(dates_doy), 
-                                        format = "%Y%j"), "%Y%m"))
-  
-  file_out <- paste0("data/rst/", product, ".006/whittaker_mvc/MVC")
-  
-  #           id_start <- grep("2013", fls_doy)[1]
-  #           
-  #           id_end <- grep("2014", fls_doy)
-  #           id_end <- id_end[length(id_end)]
-  #           
-  #           rst_scl <- rst_scl[[id_start:id_end]]
-  #           rst_doy <- rst_doy[[id_start:id_end]]
-  #           dates_doy <- dates_doy[id_start:id_end]
-  #           months_doy <- months_doy[127:(127+23)]
-  
-  # aggregate to maximum value composites (mvc)
-  cat("Initializing creation of maximum value composites for", product, "...\n")
-  rst_wht_mvc <- aggregateNDVICells(rst = rst_scl, 
-                                    rst_doy = rst_doy, 
-                                    dates = dates_doy, 
-                                    cores = 3, 
-                                    save_output = TRUE, filename = file_out, 
-                                    bylayer = TRUE, suffix = months_doy, 
-                                    format = "GTiff", overwrite = TRUE)
-  
-  # reimport mvc layers
-  fls_wht_mvc <- list.files(paste0("data/rst/", product, ".006/whittaker_mvc/"), 
-                            pattern = "^MVC.*.tif$", full.names = TRUE)
-  
-  
-  ## deseasoning
-  fls_scl <- list.files(dir_scl, pattern = "^SCL_MVC", full.names = TRUE)
-  
-  # start and end month
-  st <- grep("200301", fls_scl)
-  nd <- grep("201412", fls_scl)
-  
-  # deseason
-  rst_scl <- raster::stack(fls_scl[st:nd])
-  rst_dsn <- remote::deseason(rst_scl)
-  
-  # store
-  dir_dsn <- paste0("data/rst/", h, "/whittaker_dsn")
-  fls_dsn <- paste0(dir_dsn, "/DSN_", names(rst_scl))
-  lst_dsn <- foreach(i = raster::unstack(rst_dsn), j = as.list(fls_dsn)) %do% {
-                       raster::writeRaster(i, filename = j, format = "GTiff", overwrite = TRUE)
+  lst_ndvi <- foreach(product = list("MOD13Q1", "MYD13Q1"), 
+                      layers = lst_ndvi_qc) %do% {
+                        
+    ## initial files (for date information)
+    ndvi.fls.init <- list.files(paste0("data/MODIS_ARC/PROCESSED/", product, collection),
+                                pattern = paste(product, "NDVI.tif$", sep = ".*"), 
+                                full.names = TRUE, recursive = TRUE)
+                        
+    ## application of whittaker smoothing algorithm
+    cat("Applying Whittaker smoothier...\n")
+    
+    drs_wht <- paste0("data/rst/", product, collection, "/whittaker")
+    if (!dir.exists(drs_wht)) dir.create(drs_wht)
+                        
+#     rst.wht <- whittaker.raster(vi = layers, removeOutlier = TRUE, 
+#                                 threshold = 2000,
+#                                 timeInfo = orgTime(ndvi.fls.init, pillow = 0), 
+#                                 lambda = 6000, nIter = 3, groupYears = FALSE, 
+#                                 outDirPath = drs_wht, 
+#                                 overwrite = TRUE, format = "raster")
+    
+    
+    # Application of scale factor and removal of inconsistent values
+    cat("Applying scale factor...\n")
+    
+    fls_wht <- list.files(drs_wht, pattern = "^MCD.*yL6000.ndvi.tif$", 
+                          full.names = TRUE)
+    rst_wht <- raster::stack(fls_wht)
+    dir_scl <- paste0("data/rst/", product, collection, "/whittaker_scl")
+    if (!dir.exists(dir_scl)) dir.create(dir_scl)
+    
+    fls_scl <- paste0(dir_scl, "/SCL_", names(rst_wht))
+    
+    lst_scl <- foreach(i = unstack(rst_wht), j = as.list(fls_scl), 
+                       .packages = c("raster", "rgdal"), 
+                       .export = ls(envir = globalenv())) %dopar% {  
+                         
+      # scale factor                   
+      rst <- i
+      rst <- rst / 10000
+      
+      # rejection of inconsistent values
+      id <- which(rst[] < -1 | rst[] > 1)
+      
+      if (length(id) > 0) {
+        rst[id] <- NA
+      }
+      
+      # store
+      writeRaster(rst, filename = j, format = "GTiff", overwrite = TRUE)
+    }
+    
+    rst_scl <- stack(lst_scl)
+                        
+    fls_scl <- substr(fls_scl, 1, nchar(fls_scl) - 5)
+    fls_scl <- paste0(fls_scl, ".tif")
+    rst_scl <- raster::stack(fls_scl)
+    
+    ## monthly aggregation (shifted scaling and mvc creation; remember to 
+    ## adjust this when running the script the next time)
+    
+    dates <- MODIS::orgTime(ndvi.fls.init)$inputLayerDates
+    dates_agg <- dates + 8
+    yearmon_agg <- zoo::as.yearmon(dates_agg)
+    indices_agg <- as.numeric(as.factor(yearmon_agg))
+    
+    outdir <- paste0("data/rst/", product, collection, "/whittaker")
+    
+    # composite day of the year
+    fls_doy <- list.files(paste0("data/rst/", product, collection, "/crp"), 
+                          full.names = TRUE, pattern = paste0("^CRP_", toupper(product), ".*composite"))
+    rst_doy <- raster::stack(fls_doy)
+    
+    # output file
+    dates_doy <- as.numeric(substr(basename(fls_doy), 14, 20))
+    months_doy <- unique(strftime(as.Date(as.character(dates_doy), 
+                                          format = "%Y%j"), "%Y%m"))
+    
+    dir_mvc <- paste0("data/rst/", product, collection, "/whittaker_mvc/")
+    if (!dir.exists(dir_mvc)) dir.create(dir_mvc)
+    
+    file_out <- paste0(dir_mvc, "MVC")
+    
+    #           id_start <- grep("2013", fls_doy)[1]
+    #           
+    #           id_end <- grep("2014", fls_doy)
+    #           id_end <- id_end[length(id_end)]
+    #           
+    #           rst_scl <- rst_scl[[id_start:id_end]]
+    #           rst_doy <- rst_doy[[id_start:id_end]]
+    #           dates_doy <- dates_doy[id_start:id_end]
+    #           months_doy <- months_doy[127:(127+23)]
+    
+    # aggregate to maximum value composites (mvc)
+    cat("Applying monthly value aggregation...\n")
+    
+    rst_wht_mvc <- aggregateNDVICells(rst = rst_scl, 
+                                      rst_doy = rst_doy, 
+                                      dates = dates_doy, 
+                                      cores = 3, 
+                                      save_output = TRUE, filename = file_out, 
+                                      bylayer = TRUE, suffix = months_doy, 
+                                      format = "GTiff", overwrite = TRUE)
+    
+    # reimport mvc layers
+    fls_wht_mvc <- list.files(paste0("data/rst/", product, collection, "/whittaker_mvc/"), 
+                              pattern = "^MVC.*.tif$", full.names = TRUE)
+    
+    ## deseasoning
+    cat("Applying deseasoning...\n")
+    
+    fls_mvc <- list.files(dir_mvc, pattern = "^MVC", full.names = TRUE)
+    
+    # start and end month
+    st <- grep("200301", fls_mvc)
+    nd <- grep("201312", fls_mvc)
+    
+    # deseason
+    rst_mvc <- raster::stack(fls_mvc[st:nd])
+    rst_dsn <- remote::deseason(rst_mvc, use.cpp = TRUE)
+    
+    # store
+    dir_dsn <- paste0("data/rst/", product, collection, "/whittaker_dsn")
+    if (!dir.exists(dir_dsn)) dir.create(dir_dsn)
+    
+    fls_dsn <- paste0(dir_dsn, "/DSN_", names(rst_mvc))
+    lst_dsn <- foreach(i = raster::unstack(rst_dsn), j = as.list(fls_dsn)) %do% {
+      raster::writeRaster(i, filename = j, format = "GTiff", overwrite = TRUE)
+    }
+    
+    rst_dsn <- raster::stack(lst_dsn)
   }
-  
-  rst_dsn <- raster::stack(lst_dsn)
 }
 
 # Store percentage information about significant NDVI pixels
